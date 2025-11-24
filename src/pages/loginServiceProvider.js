@@ -23,8 +23,8 @@ function loginServiceProvider() {
       border: "1px solid #0e3b7a",
       alignSelf: "center",
       marginLeft: "3%",
-      backgroundColor: "#FF9500",
-      height: "40px",
+      backgroundColor: "#0e3b7a",
+      height: "35px",
       width: { xs: "45px", sm: "50px", md: "55px", lg: "60px", xl: "65px" },
     },
 
@@ -33,6 +33,7 @@ function loginServiceProvider() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
+      // border: "solid green 2px",
     },
 
     form_subparent_box: {
@@ -49,7 +50,9 @@ function loginServiceProvider() {
       height: {
         xs: "auto",
         md: "60%",
+        lg: "80%",
       },
+      // border: "solid green 2px",
     },
 
     button_login: {
@@ -60,19 +63,26 @@ function loginServiceProvider() {
         lg: "60px",
         xl: "60px",
       },
-      backgroundColor: "#0e3b7a",
+      backgroundColor: "#B3001B",
       borderRadius: "3px",
       display: "flex",
       justifyContent: "center",
     },
   };
 
+  const handleSignupButton = () => {
+    router.push("/signupServiceProvider");
+  };
+  const handleGoHomeButton = () => {
+    router.push("/");
+  };
+
   return (
     <Box sx={style.loginServiceProviderBox}>
       <Box sx={style.navbar_box}>
-        <Button sx={style.button_back}>
+        <Button sx={style.button_back} onClick={handleGoHomeButton}>
           <ArrowBackIcon
-            sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, color: "#0e3b7a" }}
+            sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, color: "#f7f7f7" }}
           />
         </Button>
       </Box>
@@ -80,7 +90,7 @@ function loginServiceProvider() {
       <Box component="form" autoComplete="off" sx={style.form_parent_box}>
         <Box sx={style.form_subparent_box}>
           <Typography
-            sx={{ borderBottom: "1px solid #0e3b7a", color: "#0e3b7a" }}
+            sx={{ borderBottom: "1px solid #0e3b7a", color: "#B3001B" }}
           >
             Login | Caregiver
           </Typography>
@@ -91,12 +101,12 @@ function loginServiceProvider() {
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#0e3b7a" },
+              style: { color: "#B3001B" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #0e3b7a" },
-                "&.Mui-focused fieldset": { border: "2px solid #0e3b7a" },
+                "&:hover fieldset": { border: "2px solid #B3001B" },
+                "&.Mui-focused fieldset": { border: "2px solid #B3001B" },
               },
             }}
           />
@@ -107,18 +117,35 @@ function loginServiceProvider() {
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#0e3b7a" },
+              style: { color: "#B3001B" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #0e3b7a" },
-                "&.Mui-focused fieldset": { border: "2px solid #0e3b7a" },
+                "&:hover fieldset": { border: "2px solid #B3001B" },
+                "&.Mui-focused fieldset": { border: "2px solid #B3001B" },
               },
             }}
           />
 
           <Box sx={style.button_login}>
             <Button sx={{ color: "#F7F7F7" }}>Login</Button>
+          </Box>
+          <Box>
+            <Typography>
+              Don't have an account?{" "}
+              <Button
+                sx={{
+                  color: "#0e3b7a",
+                  fontWeight: "bold",
+                  "&:hover": {
+                    border: "solid #0e3b7a 1px",
+                  },
+                }}
+                onClick={handleSignupButton}
+              >
+                SignUp
+              </Button>
+            </Typography>
           </Box>
         </Box>
       </Box>

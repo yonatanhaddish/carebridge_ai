@@ -45,16 +45,16 @@ function Navbar() {
       color: "#0e3b7a",
     },
     button_login_client: {
-      border: "1px solid #0e3b7a",
+      //   border: "1px solid #0e3b7a",
       width: "45%",
       backgroundColor: "#0e3b7a",
       color: "#f7f7f7",
     },
     button_login_provider: {
-      border: "1px solid #0e3b7a",
+      //   border: "1px solid #0e3b7a",
       width: "45%",
-      color: "#020e20",
-      backgroundColor: "#FF9500",
+      color: "#f7f7f7",
+      backgroundColor: "#B3001B",
     },
   };
 
@@ -67,7 +67,7 @@ function Navbar() {
         <ElderlyWomanIcon sx={styles.navbar_logo_icon} />
         <Typography sx={styles.navbar_logo_text}>
           {" "}
-          <span style={{ color: "#FF9500" }}>Care</span>Bridge
+          <span style={{ color: "#B3001B" }}>Care</span>Bridge
         </Typography>
       </Box>
       <Box sx={styles.navbar_button_box}>

@@ -20,7 +20,7 @@ function LandingPage() {
       alignSelf: "center",
       flexDirection: "column",
       display: "flex",
-      gap: 4,
+      gap: 6,
     },
     image_box: {
       // border: "solid green 2px",
@@ -52,16 +52,16 @@ function LandingPage() {
       alignSelf: "center",
     },
     button_client: {
-      border: "1px solid #0e3b7a",
+      //   border: "1px solid #0e3b7a",
       width: "40%",
       backgroundColor: "#0e3b7a",
       color: "#f7f7f7",
     },
     button_psw: {
-      border: "1px solid #0e3b7a",
+      //   border: "1px solid #0e3b7a",
       width: "40%",
-      color: "#020e20",
-      backgroundColor: "#FF9500",
+      color: "#f7f7f7",
+      backgroundColor: "#B3001B",
     },
   };
 
@@ -72,8 +72,9 @@ function LandingPage() {
     <Box sx={styles.landing_page_box}>
       <Box sx={styles.landingpage_info_box}>
         <Typography sx={styles.typo_heading}>
-          CareBridge: Connecting{" "}
-          <span style={{ color: "#FF9500" }}>Caregivers</span> and{" "}
+          <span style={{ color: "#B3001B" }}>Care</span>
+          <span style={{ color: "#0e3b7a" }}>Bridge</span> : Connecting{" "}
+          <span style={{ color: "#B3001B" }}>Caregivers</span> and{" "}
           <span style={{ color: "#0e3b7a" }}>Clients</span>
         </Typography>
         <Typography sx={styles.typo_description}>

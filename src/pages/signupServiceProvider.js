@@ -27,8 +27,8 @@ function signupServiceProvider() {
       border: "1px solid #0e3b7a",
       alignSelf: "center",
       marginLeft: "3%",
-      backgroundColor: "#FF9500",
-      height: "40px",
+      backgroundColor: "#0e3b7a",
+      height: "35px",
       width: { xs: "45px", sm: "50px", md: "55px", lg: "60px", xl: "65px" },
     },
 
@@ -37,13 +37,14 @@ function signupServiceProvider() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
+      //   border: "solid red 2px",
     },
 
     form_subparent_box: {
       display: "flex",
       flexDirection: "column",
       gap: "30px",
-
+      //   border: "solid red 2px",
       // width changes for all screen sizes
       width: {
         xs: "90%",
@@ -56,6 +57,7 @@ function signupServiceProvider() {
       height: {
         xs: "auto",
         md: "80%",
+        lg: "80%",
       },
     },
 
@@ -67,27 +69,49 @@ function signupServiceProvider() {
         lg: "60px",
         xl: "60px",
       },
-      backgroundColor: "#0e3b7a",
+      backgroundColor: "#B3001B",
       borderRadius: "3px",
       display: "flex",
       justifyContent: "center",
     },
   };
 
+  const handleLoginButton = () => {
+    router.push("/loginServiceProvider");
+  };
+  const handleGoHomeButton = () => {
+    router.push("/");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (password !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+    console.log("eeeeeeee", e);
+  };
+
   return (
     <Box sx={style.signupServiceProviderBox}>
       <Box sx={style.navbar_box}>
-        <Button sx={style.button_back}>
+        <Button sx={style.button_back} onClick={handleGoHomeButton}>
           <ArrowBackIcon
-            sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, color: "#0e3b7a" }}
+            sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, color: "#f7f7f7" }}
           />
         </Button>
       </Box>
 
-      <Box component="form" autoComplete="off" sx={style.form_parent_box}>
+      <Box
+        component="form"
+        autoComplete="off"
+        sx={style.form_parent_box}
+        onSubmit={handleSubmit}
+      >
         <Box sx={style.form_subparent_box}>
           <Typography
-            sx={{ borderBottom: "1px solid #0e3b7a", color: "#0e3b7a" }}
+            sx={{ borderBottom: "1px solid #0e3b7a", color: "#B3001B" }}
           >
             Signup | Caregiver
           </Typography>
@@ -95,18 +119,20 @@ function signupServiceProvider() {
           <TextField
             required
             label="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#0e3b7a" },
+              style: { color: "#B3001B" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 "&:hover fieldset": {
-                  border: "2px solid #0e3b7a",
+                  border: "2px solid #B3001B",
                 },
                 "&.Mui-focused fieldset": {
-                  border: "2px solid #0e3b7a",
+                  border: "2px solid #B3001B",
                 },
               },
             }}
@@ -115,18 +141,20 @@ function signupServiceProvider() {
           <TextField
             label="Password"
             type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#0e3b7a" },
+              style: { color: "#B3001B" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 "&:hover fieldset": {
-                  border: "2px solid #0e3b7a",
+                  border: "2px solid #B3001B",
                 },
                 "&.Mui-focused fieldset": {
-                  border: "2px solid #0e3b7a",
+                  border: "2px solid #B3001B",
                 },
               },
             }}
@@ -135,25 +163,53 @@ function signupServiceProvider() {
           <TextField
             label="Confirm Password"
             type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#0e3b7a" },
+              style: { color: "#B3001B" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 "&:hover fieldset": {
-                  border: "2px solid #0e3b7a",
+                  border: "2px solid #B3001B",
                 },
                 "&.Mui-focused fieldset": {
-                  border: "2px solid #0e3b7a",
+                  border: "2px solid #B3001B",
                 },
               },
             }}
           />
 
           <Box sx={style.button_signup}>
-            <Button sx={{ color: "#F7F7F7" }}>SignUp</Button>
+            <Button
+              type="submit"
+              sx={{
+                color: "#F7F7F7",
+                width: "100%",
+                "&:hover": { backgroundColor: "#990016" }, // slightly darker on hover
+              }}
+            >
+              SignUp
+            </Button>
+          </Box>
+          <Box>
+            <Typography>
+              Already have an account?
+              <Button
+                sx={{
+                  color: "#0e3b7a",
+                  fontWeight: "bold",
+                  "&:hover": {
+                    border: "solid #0e3b7a 1px",
+                  },
+                }}
+                onClick={handleLoginButton}
+              >
+                Login
+              </Button>
+            </Typography>
           </Box>
         </Box>
       </Box>
