@@ -23,38 +23,38 @@ function Navbar() {
       display: "flex",
       alignItems: "center",
       gap: 1,
-      color: "#0e3b7a",
+      color: "#4749df",
       width: "200px",
-      // border: '1px solid #0e3b7a',
+      // border: '1px solid #4749df',
     },
     navbar_button_box: {
       display: "flex",
       alignItems: "center",
       gap: 2,
-      // border: '1px solid #0e3b7a',
+      // border: '1px solid #4749df',
       width: "350px",
       justifyContent: "space-between",
     },
     navbar_logo_icon: {
       fontSize: 38,
-      color: "#0e3b7a",
+      color: "#4749df",
     },
     navbar_logo_text: {
       fontSize: 18,
       fontWeight: "bold",
-      color: "#0e3b7a",
+      color: "#4749df",
     },
     button_login_client: {
-      //   border: "1px solid #0e3b7a",
+      border: "2px solid #4749df",
       width: "45%",
-      backgroundColor: "#0e3b7a",
-      color: "#f7f7f7",
+      //   backgroundColor: "#4749df",
+      color: "#020e20",
     },
     button_login_provider: {
-      //   border: "1px solid #0e3b7a",
+      border: "1px solid #020e20",
       width: "45%",
       color: "#f7f7f7",
-      backgroundColor: "#B3001B",
+      backgroundColor: "#4749df",
     },
   };
 
@@ -65,10 +65,7 @@ function Navbar() {
     <Box sx={styles.navbar_box}>
       <Box sx={styles.navbar_logo_box}>
         <ElderlyWomanIcon sx={styles.navbar_logo_icon} />
-        <Typography sx={styles.navbar_logo_text}>
-          {" "}
-          <span style={{ color: "#B3001B" }}>Care</span>Bridge
-        </Typography>
+        <Typography sx={styles.navbar_logo_text}>CareBridge</Typography>
       </Box>
       <Box sx={styles.navbar_button_box}>
         <Button sx={styles.button_login_client}>I need Care</Button>

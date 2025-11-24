@@ -24,10 +24,10 @@ function signupServiceProvider() {
     },
 
     button_back: {
-      border: "1px solid #0e3b7a",
+      border: "1px solid #020e20",
       alignSelf: "center",
       marginLeft: "3%",
-      backgroundColor: "#0e3b7a",
+      backgroundColor: "#020e20",
       height: "35px",
       width: { xs: "45px", sm: "50px", md: "55px", lg: "60px", xl: "65px" },
     },
@@ -111,7 +111,7 @@ function signupServiceProvider() {
       >
         <Box sx={style.form_subparent_box}>
           <Typography
-            sx={{ borderBottom: "1px solid #0e3b7a", color: "#B3001B" }}
+            sx={{ borderBottom: "1px solid #020e20", color: "#020e20" }}
           >
             Signup | Caregiver
           </Typography>
@@ -124,21 +124,22 @@ function signupServiceProvider() {
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#B3001B" },
+              style: { color: "#020e20" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 "&:hover fieldset": {
-                  border: "2px solid #B3001B",
+                  border: "2px solid #020e20",
                 },
                 "&.Mui-focused fieldset": {
-                  border: "2px solid #B3001B",
+                  border: "2px solid #020e20",
                 },
               },
             }}
           />
 
           <TextField
+            required
             label="Password"
             type="password"
             value={password}
@@ -146,21 +147,22 @@ function signupServiceProvider() {
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#B3001B" },
+              style: { color: "#020e20" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 "&:hover fieldset": {
-                  border: "2px solid #B3001B",
+                  border: "2px solid #020e20",
                 },
                 "&.Mui-focused fieldset": {
-                  border: "2px solid #B3001B",
+                  border: "2px solid #020e20",
                 },
               },
             }}
           />
 
           <TextField
+            required
             label="Confirm Password"
             type="password"
             value={confirmPassword}
@@ -168,15 +170,15 @@ function signupServiceProvider() {
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#B3001B" },
+              style: { color: "#020e20" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 "&:hover fieldset": {
-                  border: "2px solid #B3001B",
+                  border: "2px solid #020e20",
                 },
                 "&.Mui-focused fieldset": {
-                  border: "2px solid #B3001B",
+                  border: "2px solid #020e20",
                 },
               },
             }}
@@ -199,10 +201,10 @@ function signupServiceProvider() {
               Already have an account?
               <Button
                 sx={{
-                  color: "#0e3b7a",
+                  color: "#020e20",
                   fontWeight: "bold",
                   "&:hover": {
-                    border: "solid #0e3b7a 1px",
+                    border: "solid #020e20 1px",
                   },
                 }}
                 onClick={handleLoginButton}

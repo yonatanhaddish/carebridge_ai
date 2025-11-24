@@ -52,16 +52,15 @@ function LandingPage() {
       alignSelf: "center",
     },
     button_client: {
-      //   border: "1px solid #0e3b7a",
+      border: "2px solid #4749df",
       width: "40%",
-      backgroundColor: "#0e3b7a",
-      color: "#f7f7f7",
+      color: "#020e20",
     },
     button_psw: {
-      //   border: "1px solid #0e3b7a",
+      border: "1px solid #020e20",
       width: "40%",
+      backgroundColor: "#4749df",
       color: "#f7f7f7",
-      backgroundColor: "#B3001B",
     },
   };
 
@@ -72,10 +71,9 @@ function LandingPage() {
     <Box sx={styles.landing_page_box}>
       <Box sx={styles.landingpage_info_box}>
         <Typography sx={styles.typo_heading}>
-          <span style={{ color: "#B3001B" }}>Care</span>
-          <span style={{ color: "#0e3b7a" }}>Bridge</span> : Connecting{" "}
-          <span style={{ color: "#B3001B" }}>Caregivers</span> and{" "}
-          <span style={{ color: "#0e3b7a" }}>Clients</span>
+          <span style={{ color: "#020e20" }}>CareBridge</span> : Connecting{" "}
+          <span style={{ color: "#4749df" }}>Caregivers</span> and{" "}
+          <span style={{ color: "#4749df" }}>Clients</span>
         </Typography>
         <Typography sx={styles.typo_description}>
           A simple, secure platform where Personal Support Workers share
