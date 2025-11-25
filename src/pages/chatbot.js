@@ -10,7 +10,7 @@ function chatbot() {
   };
   return (
     <Box>
-      <Button onClick={handleLogout}>Logout</Button>
+      <Button onClick={handleLogout}>Logout -- Test</Button>
     </Box>
   );
 }
