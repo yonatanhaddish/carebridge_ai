@@ -94,8 +94,8 @@ function LandingPage() {
             }}
           >
             CareBridge
-          </span>{" "}
-          : Connecting{" "}
+          </span>
+          :Connecting{" "}
           <span
             style={{
               color: "#020e20",

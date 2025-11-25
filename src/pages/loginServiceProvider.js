@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/router";
 import { Box, Typography, Button, TextField } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -6,6 +6,10 @@ import Footer from "../components/Footer";
 
 function loginServiceProvider() {
   const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const style = {
     loginServiceProviderBox: {
@@ -83,6 +87,34 @@ function loginServiceProvider() {
     router.push("/");
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      console.log("4444444", data);
+
+      if (!data.success) {
+        setError(data.error || "Login failed");
+        setLoading(false);
+        return;
+      }
+      // Redirect to dashboard or landing page after signup
+      setEmail("");
+      setPassword("");
+      router.push("/chatbot");
+    } catch (err) {
+      setError("An unexpected error occurred");
+      console.log("errrrrrrrrrrrrrrrr", err);
+    }
+  };
   return (
     <Box sx={style.loginServiceProviderBox}>
       <Box sx={style.navbar_box}>
@@ -93,7 +125,12 @@ function loginServiceProvider() {
         </Button>
       </Box>
 
-      <Box component="form" autoComplete="off" sx={style.form_parent_box}>
+      <Box
+        component="form"
+        autoComplete="off"
+        sx={style.form_parent_box}
+        onSubmit={handleSubmit}
+      >
         <Box sx={style.form_subparent_box}>
           <Typography
             sx={{ borderBottom: "1px solid #0e3b7a", color: "#4749df" }}
@@ -104,41 +141,47 @@ function loginServiceProvider() {
 
           <TextField
             required
+            value={email}
             label="Email"
             InputLabelProps={{
               shrink: true,
-              style: { color: "#4749df" },
+              style: { color: "#020e20" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #4749df" },
-                "&.Mui-focused fieldset": { border: "2px solid #4749df" },
+                "&:hover fieldset": { border: "2px solid #020e20" },
+                "&.Mui-focused fieldset": { border: "2px solid #020e20" },
               },
               width: "80%",
               alignSelf: "center",
             }}
+            onChange={(e) => setEmail(e.target.value)}
           />
 
           <TextField
             label="Password"
             type="password"
+            value={password}
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#4749df" },
+              style: { color: "#020e20" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #4749df" },
-                "&.Mui-focused fieldset": { border: "2px solid #4749df" },
+                "&:hover fieldset": { border: "2px solid #020e20" },
+                "&.Mui-focused fieldset": { border: "2px solid #020e20" },
               },
               width: "80%",
               alignSelf: "center",
             }}
+            onChange={(e) => setPassword(e.target.value)}
           />
 
           <Box sx={style.button_login}>
-            <Button sx={{ color: "#F7F7F7", width: "100%" }}>Login</Button>
+            <Button type="submit" sx={{ color: "#F7F7F7", width: "100%" }}>
+              Login
+            </Button>
           </Box>
           <Box sx={style.button_signup}>
             <Typography>

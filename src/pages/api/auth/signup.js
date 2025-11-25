@@ -1,7 +1,7 @@
-import dbConnect from "../../lib/mongoose";
-import User from "../../models/User";
+import dbConnect from "../../../lib/mongoose";
+import User from "../../../models/User";
 import bcrypt from "bcryptjs";
-import { signToken } from "../../lib/jwt";
+import { signToken } from "../../../lib/jwt";
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   });
 
   // Sign JWT
-  const token = signToken({ id: user._id, email: user.email, role: user.role });
+  const token = signToken({ id: user._id, email: user.email });
 
   // Send HTTP-only cookie
   res.setHeader(
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
 
   res.status(201).json({
     message: "User created successfully",
+    success: true,
     user: {
       id: user.id,
       email: user.email,

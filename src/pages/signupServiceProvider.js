@@ -10,6 +10,7 @@ function signupServiceProvider() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
 
   const style = {
     signupServiceProviderBox: {
@@ -91,10 +92,32 @@ function signupServiceProvider() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
 
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role: "Service Provider" }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error || "Signup failed");
+        setLoading(false);
+        return;
+      }
+      // Redirect to dashboard or landing page after signup
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      router.push("/serviceProviderRegister");
+    } catch (err) {
+      setError("An unexpected error occurred");
     }
   };
 
