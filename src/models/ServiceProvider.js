@@ -40,6 +40,7 @@ const serviceProviderSchema = new mongoose.Schema({
     type: String,
     default: uuidv4,
     unique: true,
+    index: true, // Fast lookup
   },
   first_name: { type: String, required: true },
   last_name: { type: String, required: true },

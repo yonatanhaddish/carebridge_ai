@@ -103,7 +103,7 @@ function loginServiceSeeker() {
 
       if (!data.success) {
         setError(data.error || "Login failed");
-        setLoading(false);
+        // setLoading(false);
         return;
       }
       // Redirect to dashboard or landing page after signup

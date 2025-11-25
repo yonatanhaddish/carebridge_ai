@@ -6,15 +6,17 @@ import { signToken } from "../../../lib/jwt";
 export default async function handler(req, res) {
   await dbConnect();
 
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
 
   const { email, password } = req.body;
 
   console.log("LOGIN ATTEMPT:", { email });
 
-  if (!email || !password)
-    return res.status(400).json({ error: "email and password required" });
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
 
   // Lookup user by email
   const user = await User.findOne({ email });
@@ -31,10 +33,10 @@ export default async function handler(req, res) {
     role: user.role,
   });
 
-  // Send HTTP-only cookie
+  // Send HTTP-only cookie (7 days)
   res.setHeader(
     "Set-Cookie",
-    `token=${token}; HttpOnly; Path=/; Max-Age=604800` // 7 days
+    `token=${token}; HttpOnly; Path=/; Max-Age=604800; Secure; SameSite=Strict`
   );
 
   // Response
@@ -42,7 +44,7 @@ export default async function handler(req, res) {
     message: "User login successful",
     success: true,
     user: {
-      user_id: user.user_id, // 👈 UUID returned
+      user_id: user.user_id,
       email: user.email,
       role: user.role,
     },

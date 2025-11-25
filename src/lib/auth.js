@@ -29,25 +29,6 @@ export function authMiddleware(handler) {
 }
 
 /**
- * Get logged-in user from request (optional auth, non-protected route)
- */
-export function getLoggedInUser(req) {
-  const token = req.cookies?.token;
-  if (!token) return null;
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return {
-      user_id: decoded.user_id,
-      email: decoded.email,
-      role: decoded.role,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Clear JWT cookie (logout)
  */
 export function logoutUser(res) {
