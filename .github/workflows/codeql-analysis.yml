@@ -1,0 +1,30 @@
+name: "CodeQL Scan"
+
+on:
+  push:
+    branches: [ "main" ]   # Runs on pushes to main branch
+  pull_request:
+    # Also runs on PRs targeting main
+    branches: [ "main" ]
+
+jobs:
+  analyze:
+    name: Analyze Code
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript
+        # Add more languages if needed, e.g., python, java
+        # languages: javascript, python
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
