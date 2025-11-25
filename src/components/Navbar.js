@@ -58,8 +58,11 @@ function Navbar() {
     },
   };
 
-  const handleLoginButton = () => {
+  const handleLoginServiceProvider = () => {
     router.push("/signupServiceProvider");
+  };
+  const handleLoginServiceSeeker = () => {
+    router.push("/signupServiceSeeker");
   };
   return (
     <Box sx={styles.navbar_box}>
@@ -68,8 +71,16 @@ function Navbar() {
         <Typography sx={styles.navbar_logo_text}>CareBridge</Typography>
       </Box>
       <Box sx={styles.navbar_button_box}>
-        <Button sx={styles.button_login_client}>I need Care</Button>
-        <Button sx={styles.button_login_provider} onClick={handleLoginButton}>
+        <Button
+          sx={styles.button_login_client}
+          onClick={handleLoginServiceSeeker}
+        >
+          I need Care
+        </Button>
+        <Button
+          sx={styles.button_login_provider}
+          onClick={handleLoginServiceProvider}
+        >
           I'm PSW
         </Button>
       </Box>

@@ -76,8 +76,11 @@ function LandingPage() {
     },
   };
 
-  const handleLoginButton = () => {
+  const handleLoginServiceProvider = () => {
     router.push("/loginServiceProvider");
+  };
+  const handleLoginServiceSeeker = () => {
+    router.push("/signupServiceSeeker");
   };
   return (
     <Box sx={styles.landing_page_box}>
@@ -128,8 +131,10 @@ function LandingPage() {
           convenience.
         </Typography>
         <Box sx={styles.button_box}>
-          <Button sx={styles.button_client}>I need care</Button>
-          <Button sx={styles.button_psw} onClick={handleLoginButton}>
+          <Button sx={styles.button_client} onClick={handleLoginServiceSeeker}>
+            I need care
+          </Button>
+          <Button sx={styles.button_psw} onClick={handleLoginServiceProvider}>
             I am PSW
           </Button>
         </Box>
