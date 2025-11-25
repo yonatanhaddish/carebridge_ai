@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   if (!valid) return res.status(401).json({ error: "Invalid credentials" });
 
   // Sign JWT
-  const token = signToken({ id: user.id, email: user.email });
+  const token = signToken({ id: user._id, email: user.email });
 
   // Send HTTP-only cookie
   res.setHeader(
