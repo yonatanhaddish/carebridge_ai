@@ -1,21 +1,13 @@
-import cookie from "cookie";
+// pages/api/auth/logout.js
+import { logoutUser } from "../../../lib/auth";
 
 export default function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Clear cookie by setting expired date
-  res.setHeader(
-    "Set-Cookie",
-    cookie.serialize("token", "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      expires: new Date(0), // expire immediately
-    })
-  );
+  // Clear cookie
+  logoutUser(res);
 
-  return res.json({ success: true, message: "Logged out successfully" });
+  res.status(200).json({ message: "Logged out successfully" });
 }
