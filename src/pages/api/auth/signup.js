@@ -11,37 +11,46 @@ export default async function handler(req, res) {
 
   const { email, password, role } = req.body;
 
-  if (!email || !password)
-    return res.status(400).json({ error: "email, and password required" });
+  // Validation
+  if (!email || !password || !role)
+    return res
+      .status(400)
+      .json({ error: "email, password, and role are required" });
 
+  // Check if email exists
   const existing = await User.findOne({ email });
   if (existing)
     return res.status(400).json({ error: "Email already registered" });
 
-  // Hash the password
+  // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create user
+  // Create user (UUID auto-generated)
   const user = await User.create({
     email,
     password: hashedPassword,
-    role: role,
+    role,
   });
 
-  // Sign JWT
-  const token = signToken({ id: user._id, email: user.email });
+  // Generate JWT with UUID instead of _id
+  const token = signToken({
+    user_id: user.user_id,
+    email: user.email,
+    role: user.role,
+  });
 
-  // Send HTTP-only cookie
+  // Set cookie (7 days)
   res.setHeader(
     "Set-Cookie",
-    `token=${token}; HttpOnly; Path=/; Max-Age=604800` // 7 days
+    `token=${token}; HttpOnly; Path=/; Max-Age=604800`
   );
 
+  // Response
   res.status(201).json({
     message: "User created successfully",
     success: true,
     user: {
-      id: user.id,
+      user_id: user.user_id,
       email: user.email,
       role: user.role,
     },

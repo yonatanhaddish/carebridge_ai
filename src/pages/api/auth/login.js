@@ -11,31 +11,38 @@ export default async function handler(req, res) {
 
   const { email, password } = req.body;
 
-  console.log("1111111", { email, password });
+  console.log("LOGIN ATTEMPT:", { email });
 
   if (!email || !password)
-    return res.status(400).json({ error: "email, and password required" });
+    return res.status(400).json({ error: "email and password required" });
 
+  // Lookup user by email
   const user = await User.findOne({ email });
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
+  // Validate password
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(401).json({ error: "Invalid credentials" });
 
-  // Sign JWT
-  const token = signToken({ id: user._id, email: user.email });
+  // 🔑 Sign JWT using UUID instead of _id
+  const token = signToken({
+    user_id: user.user_id,
+    email: user.email,
+    role: user.role,
+  });
 
   // Send HTTP-only cookie
   res.setHeader(
     "Set-Cookie",
-    `token=${token}; HttpOnly; Path=/; Max-Age=604800`
+    `token=${token}; HttpOnly; Path=/; Max-Age=604800` // 7 days
   );
 
-  res.status(201).json({
-    message: "User login successfully",
+  // Response
+  res.status(200).json({
+    message: "User login successful",
     success: true,
     user: {
-      id: user.id,
+      user_id: user.user_id, // 👈 UUID returned
       email: user.email,
       role: user.role,
     },
