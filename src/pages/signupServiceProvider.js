@@ -69,10 +69,16 @@ function signupServiceProvider() {
         lg: "60px",
         xl: "60px",
       },
-      backgroundColor: "#B3001B",
+      backgroundColor: "#4749df",
       borderRadius: "3px",
       display: "flex",
       justifyContent: "center",
+      width: "80%",
+      alignSelf: "center",
+    },
+    button_login: {
+      width: "80%",
+      alignSelf: "center",
     },
   };
 
@@ -90,7 +96,6 @@ function signupServiceProvider() {
       alert("Passwords do not match!");
       return;
     }
-    console.log("eeeeeeee", e);
   };
 
   return (
@@ -111,9 +116,10 @@ function signupServiceProvider() {
       >
         <Box sx={style.form_subparent_box}>
           <Typography
-            sx={{ borderBottom: "1px solid #020e20", color: "#020e20" }}
+            sx={{ borderBottom: "1px solid #0e3b7a", color: "#4749df" }}
           >
-            Signup | Caregiver
+            <span style={{ fontSize: "2rem", color: "#020e20" }}>Signup</span> |
+            Caregiver
           </Typography>
 
           <TextField
@@ -135,6 +141,8 @@ function signupServiceProvider() {
                   border: "2px solid #020e20",
                 },
               },
+              width: "80%",
+              alignSelf: "center",
             }}
           />
 
@@ -158,6 +166,8 @@ function signupServiceProvider() {
                   border: "2px solid #020e20",
                 },
               },
+              width: "80%",
+              alignSelf: "center",
             }}
           />
 
@@ -181,6 +191,8 @@ function signupServiceProvider() {
                   border: "2px solid #020e20",
                 },
               },
+              width: "80%",
+              alignSelf: "center",
             }}
           />
 
@@ -190,13 +202,12 @@ function signupServiceProvider() {
               sx={{
                 color: "#F7F7F7",
                 width: "100%",
-                "&:hover": { backgroundColor: "#990016" }, // slightly darker on hover
               }}
             >
               SignUp
             </Button>
           </Box>
-          <Box>
+          <Box sx={style.button_login}>
             <Typography>
               Already have an account?
               <Button

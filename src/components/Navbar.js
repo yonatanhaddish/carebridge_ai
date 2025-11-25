@@ -51,7 +51,7 @@ function Navbar() {
       color: "#020e20",
     },
     button_login_provider: {
-      border: "1px solid #020e20",
+      border: "1px solid #4749df",
       width: "45%",
       color: "#f7f7f7",
       backgroundColor: "#4749df",

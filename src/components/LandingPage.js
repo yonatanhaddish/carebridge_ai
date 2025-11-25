@@ -45,8 +45,9 @@ function LandingPage() {
       alignSelf: "center",
     },
     button_box: {
-      // border: "solid green 2px",
+      //   border: "solid green 2px",
       width: "70%",
+      height: "45px",
       display: "flex",
       justifyContent: "space-between",
       alignSelf: "center",
@@ -55,12 +56,23 @@ function LandingPage() {
       border: "2px solid #4749df",
       width: "40%",
       color: "#020e20",
+      "&:hover": {
+        backgroundColor: "#4749df",
+        border: "1px solid #4749df",
+        transition: "all 0.25s ease",
+        color: "#f7f7f7",
+        transform: "scale(1.08)",
+      },
     },
     button_psw: {
-      border: "1px solid #020e20",
+      border: "1px solid #4749df",
       width: "40%",
       backgroundColor: "#4749df",
+      transition: "all 0.25s ease",
       color: "#f7f7f7",
+      "&:hover": {
+        transform: "scale(1.08)",
+      },
     },
   };
 
@@ -71,9 +83,44 @@ function LandingPage() {
     <Box sx={styles.landing_page_box}>
       <Box sx={styles.landingpage_info_box}>
         <Typography sx={styles.typo_heading}>
-          <span style={{ color: "#020e20" }}>CareBridge</span> : Connecting{" "}
-          <span style={{ color: "#4749df" }}>Caregivers</span> and{" "}
-          <span style={{ color: "#4749df" }}>Clients</span>
+          <span
+            style={{
+              color: "#4749df",
+              textShadow: `
+      0 0 6px rgba(71, 73, 223, 0.6),
+      0 0 12px rgba(71, 73, 223, 0.4),
+      0 0 18px rgba(71, 73, 223, 0.25)
+    `,
+            }}
+          >
+            CareBridge
+          </span>{" "}
+          : Connecting{" "}
+          <span
+            style={{
+              color: "#020e20",
+              textShadow: `
+      0 0 100px rgba(71, 73, 223, 0.6),
+      0 0 100px rgba(71, 73, 223, 0.4),
+      0 0 20px rgba(71, 73, 223, 0.25)
+    `,
+            }}
+          >
+            Caregivers
+          </span>{" "}
+          and{" "}
+          <span
+            style={{
+              color: "#020e20",
+              textShadow: `
+           0 0 100px rgba(71, 73, 223, 0.6),
+      0 0 100px rgba(71, 73, 223, 0.4),
+      0 0 20px rgba(71, 73, 223, 0.25)
+    `,
+            }}
+          >
+            Clients
+          </span>
         </Typography>
         <Typography sx={styles.typo_description}>
           A simple, secure platform where Personal Support Workers share

@@ -1,8 +1,15 @@
 import mongoose from "mongoose";
+import { v4 as uuidv4 } from "uuid";
 
 const UserSchema = new mongoose.Schema({
+  uuid: {
+    type: String,
+    default: uuidv4,
+    unique: true,
+    index: true,
+  },
   email: { type: String, required: true, unique: true, index: true },
-  password: { type: String, required: true }, // ✅ hashed password
+  password: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -20,10 +20,10 @@ function loginServiceProvider() {
     },
 
     button_back: {
-      border: "1px solid #0e3b7a",
+      border: "1px solid #020e20",
       alignSelf: "center",
       marginLeft: "3%",
-      backgroundColor: "#0e3b7a",
+      backgroundColor: "#020e20",
       height: "35px",
       width: { xs: "45px", sm: "50px", md: "55px", lg: "60px", xl: "65px" },
     },
@@ -63,10 +63,16 @@ function loginServiceProvider() {
         lg: "60px",
         xl: "60px",
       },
-      backgroundColor: "#B3001B",
+      backgroundColor: "#4749df",
       borderRadius: "3px",
       display: "flex",
       justifyContent: "center",
+      width: "80%",
+      alignSelf: "center",
+    },
+    button_signup: {
+      width: "80%",
+      alignSelf: "center",
     },
   };
 
@@ -90,24 +96,26 @@ function loginServiceProvider() {
       <Box component="form" autoComplete="off" sx={style.form_parent_box}>
         <Box sx={style.form_subparent_box}>
           <Typography
-            sx={{ borderBottom: "1px solid #0e3b7a", color: "#B3001B" }}
+            sx={{ borderBottom: "1px solid #0e3b7a", color: "#4749df" }}
           >
-            Login | Caregiver
+            <span style={{ fontSize: "2rem", color: "#020e20" }}>Login</span> |
+            Caregiver
           </Typography>
 
           <TextField
             required
             label="Email"
-            fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#B3001B" },
+              style: { color: "#4749df" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #B3001B" },
-                "&.Mui-focused fieldset": { border: "2px solid #B3001B" },
+                "&:hover fieldset": { border: "2px solid #4749df" },
+                "&.Mui-focused fieldset": { border: "2px solid #4749df" },
               },
+              width: "80%",
+              alignSelf: "center",
             }}
           />
 
@@ -117,28 +125,30 @@ function loginServiceProvider() {
             fullWidth
             InputLabelProps={{
               shrink: true,
-              style: { color: "#B3001B" },
+              style: { color: "#4749df" },
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #B3001B" },
-                "&.Mui-focused fieldset": { border: "2px solid #B3001B" },
+                "&:hover fieldset": { border: "2px solid #4749df" },
+                "&.Mui-focused fieldset": { border: "2px solid #4749df" },
               },
+              width: "80%",
+              alignSelf: "center",
             }}
           />
 
           <Box sx={style.button_login}>
-            <Button sx={{ color: "#F7F7F7" }}>Login</Button>
+            <Button sx={{ color: "#F7F7F7", width: "100%" }}>Login</Button>
           </Box>
-          <Box>
+          <Box sx={style.button_signup}>
             <Typography>
-              Don't have an account?{" "}
+              Don't have an account?
               <Button
                 sx={{
-                  color: "#0e3b7a",
+                  color: "#020e20",
                   fontWeight: "bold",
                   "&:hover": {
-                    border: "solid #0e3b7a 1px",
+                    border: "solid #020e20 1px",
                   },
                 }}
                 onClick={handleSignupButton}
