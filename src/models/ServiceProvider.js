@@ -40,7 +40,13 @@ const serviceProviderSchema = new mongoose.Schema({
     type: String,
     default: uuidv4,
     unique: true,
-    index: true, // Fast lookup
+    index: true,
+  },
+  user_id: {
+    type: String, // if you use User.user_id (UUID string)
+    required: true,
+    ref: "User", // reference to User model
+    unique: true, // one-to-one relation
   },
   first_name: { type: String, required: true },
   last_name: { type: String, required: true },
@@ -59,10 +65,10 @@ const serviceProviderSchema = new mongoose.Schema({
   ],
   service_prices: {
     type: Map,
-    of: Number, // decimal as Number
+    of: Number,
     required: true,
   },
-  availability_calendar: [availabilityEntrySchema], // multiple ranges allowed
+  availability_calendar: [availabilityEntrySchema],
   booking_confirmation_deadline_hours: { type: Number, default: 12 },
   required_advance_notice_hours: { type: Number, default: 24 },
   profile_created_at: { type: Date, default: Date.now },

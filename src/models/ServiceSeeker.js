@@ -9,7 +9,12 @@ const serviceSeekerSchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
-
+  user_id: {
+    type: String, // if you use User.user_id (UUID string)
+    required: true,
+    ref: "User", // reference to User model
+    unique: true, // one-to-one relation
+  },
   first_name: { type: String, required: true },
   last_name: { type: String, required: true },
 

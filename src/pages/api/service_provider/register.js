@@ -1,7 +1,7 @@
 import dbConnect from "../../../lib/mongoose";
 import ServiceProvider from "../../../models/ServiceProvider";
 import cookie from "cookie";
-import { verifyToken } from "../../../lib/jwt"; // <-- must exist
+import { verifyToken } from "../../../lib/jwt"; // your JWT verification function
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -27,7 +27,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 
-  // The user who is logged in can now register as service provider
   const loggedInUserId = userData.user_id;
 
   // -------------------------------
@@ -74,7 +73,7 @@ export default async function handler(req, res) {
 
   try {
     // -------------------------------
-    // 4. CREATE SERVICE PROVIDER (NO PASSWORD)
+    // 4. CREATE SERVICE PROVIDER
     // -------------------------------
     const serviceProvider = new ServiceProvider({
       first_name,
@@ -88,7 +87,7 @@ export default async function handler(req, res) {
       service_levels_offered,
       service_prices,
       availability_calendar,
-      created_by_user_id: loggedInUserId, // optional but useful
+      user_id: loggedInUserId, // link to User table
     });
 
     await serviceProvider.save();

@@ -31,10 +31,16 @@ export default function Home() {
         className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}
       >
         <main className={styles.main}>
-          <Box sx={{  height: '100vh' , backgroundColor: '#d9d9d9'}}>
-        <Navbar />
-        <LandingPage />
-        <Footer />
+          <Box
+            sx={{
+              height: "100vh",
+              backgroundColor: "#d9d9d9",
+              // border: "green 2px solid",
+            }}
+          >
+            <Navbar />
+            <LandingPage />
+            <Footer />
           </Box>
         </main>
       </div>
