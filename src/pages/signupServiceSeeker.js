@@ -115,9 +115,9 @@ function signupServiceSeeker() {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
-      console.log("888888888", data);
+      // console.log("888888888", data);
 
-      router.push("/chatbot");
+      router.push("/serviceSeekerRegister");
     } catch (err) {
       setError("An unexpected error occurred");
     }

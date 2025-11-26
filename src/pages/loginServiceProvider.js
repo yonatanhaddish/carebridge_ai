@@ -99,11 +99,11 @@ function loginServiceProvider() {
       });
       const data = await res.json();
 
-      console.log("4444444", data);
+      // console.log("4444444", data);
 
       if (!data.success) {
         setError(data.error || "Login failed");
-        setLoading(false);
+        // setLoading(false);
         return;
       }
       // Redirect to dashboard or landing page after signup
@@ -112,7 +112,7 @@ function loginServiceProvider() {
       router.push("/chatbot");
     } catch (err) {
       setError("An unexpected error occurred");
-      console.log("errrrrrrrrrrrrrrrr", err);
+      console.log("error", err);
     }
   };
   return (

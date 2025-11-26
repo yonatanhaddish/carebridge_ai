@@ -115,7 +115,7 @@ function signupServiceProvider() {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
-      console.log("33333333", data);
+      // console.log("33333333", data);
 
       router.push("/serviceProviderRegister");
     } catch (err) {

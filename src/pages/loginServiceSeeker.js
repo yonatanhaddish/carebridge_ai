@@ -99,7 +99,7 @@ function loginServiceSeeker() {
       });
       const data = await res.json();
 
-      console.log("4444444", data);
+      // console.log("4444444", data);
 
       if (!data.success) {
         setError(data.error || "Login failed");
