@@ -95,7 +95,7 @@ function ServiceProviderRegister() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/dashboard_service_provider");
     } catch (err) {
       setError("Unexpected error occurred");
       setLoading(false);

@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   const { email, password } = req.body;
 
-  console.log("LOGIN ATTEMPT:", { email });
+  // console.log("LOGIN ATTEMPT:", { email });
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
