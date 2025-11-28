@@ -81,4 +81,5 @@ serviceProviderSchema.pre("save", function (next) {
   next();
 });
 
-export default mongoose.model("ServiceProvider", serviceProviderSchema);
+export default mongoose.models.ServiceProvider ||
+  mongoose.model("ServiceProvider", serviceProviderSchema);
