@@ -38,7 +38,7 @@ function DashboardServiceProvider() {
 
     try {
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/booking`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/booking_caledar`,
         {
           command,
         }
