@@ -32,12 +32,12 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      availability: provider.availability_calendar || [],
+      service_provider: provider || [],
     });
   } catch (err) {
-    console.error("Fetch Availability Error:", err);
+    console.error("Fetch LoggedIn User Error:", err);
     res
       .status(500)
-      .json({ error: "Failed to fetch availability", details: err.message });
+      .json({ error: "Failed to fetch loggedIn user", details: err.message });
   }
 }
