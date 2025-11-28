@@ -6,9 +6,9 @@ permissions:
 
 on:
   push:
-    branches: ["develop"]
+    branches: ["develop", "feature/shadcn_test"]
   pull_request:
-    branches: ["develop"]
+    branches: ["develop", "feature/shadcn_test"]
 
 jobs:
   analyze:
