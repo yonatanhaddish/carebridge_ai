@@ -1,22 +1,50 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import axios from "axios";
 import { Box, Typography, Button } from "@mui/material";
 import ElderlyWomanIcon from "@mui/icons-material/ElderlyWoman";
 
 function Navbar() {
   const router = useRouter();
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState("");
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json();
+        setLoggedIn(data.loggedIn);
+        setLoggedInUser(data.user);
+      } catch (e) {
+        setLoggedIn(false);
+      }
+    }
+    checkAuth();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await axios.post("/api/auth/logout");
+      setLoggedInUser("");
+      setLoggedIn(false);
+      router.push("/"); // redirect to home
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   const styles = {
     navbar_box: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      px: { xs: 2, md: 4 }, // smaller padding on mobile
+      px: { xs: 2, md: 4 },
       py: 2,
       width: "100%",
       backgroundColor: "#d9d9d9",
       borderBottom: "1px solid #e0e0e0",
-      flexDirection: { xs: "column", sm: "row" }, // stack on mobile
+      flexDirection: { xs: "column", sm: "row" },
       gap: { xs: 2, sm: 0 },
     },
     navbar_logo_box: {
@@ -25,7 +53,8 @@ function Navbar() {
       gap: 1,
       color: "#4749df",
       width: { xs: "100%", sm: "200px" },
-      justifyContent: { xs: "center", sm: "flex-start" },
+      // justifyContent: { xs: "center", sm: "flex-start" },
+      cursor: "pointer",
     },
     navbar_button_box: {
       display: "flex",
@@ -33,18 +62,18 @@ function Navbar() {
       gap: { xs: 2, sm: 2 },
       width: { xs: "100%", sm: "350px" },
       justifyContent: { xs: "center", sm: "space-between" },
-      flexDirection: { xs: "column", sm: "row" }, // stack buttons on mobile
+      flexDirection: { xs: "column", sm: "row" },
     },
     navbar_logo_icon: {
       fontSize: { xs: 28, md: 38 },
       color: "#4749df",
     },
     navbar_logo_text: {
-      fontSize: { xs: 16, md: 18 },
+      fontSize: { xs: 18, md: 20 },
       fontWeight: "bold",
       color: "#4749df",
     },
-    button_login_client: {
+    button_outline: {
       border: "2px solid #4749df",
       width: { xs: "100%", sm: "45%" },
       color: "#020e20",
@@ -53,7 +82,7 @@ function Navbar() {
         color: "#f7f7f7",
       },
     },
-    button_login_provider: {
+    button_filled: {
       border: "1px solid #4749df",
       width: { xs: "100%", sm: "45%" },
       color: "#f7f7f7",
@@ -64,32 +93,49 @@ function Navbar() {
     },
   };
 
-  const handleLoginServiceProvider = () => {
-    router.push("/signupServiceProvider");
-  };
-  const handleLoginServiceSeeker = () => {
-    router.push("/signupServiceSeeker");
-  };
-
   return (
     <Box sx={styles.navbar_box}>
-      <Box sx={styles.navbar_logo_box}>
+      {/* LOGO */}
+      <Box sx={styles.navbar_logo_box} onClick={() => router.push("/")}>
         <ElderlyWomanIcon sx={styles.navbar_logo_icon} />
         <Typography sx={styles.navbar_logo_text}>CareBridge</Typography>
       </Box>
+
+      {/* BUTTONS BASED ON AUTH */}
       <Box sx={styles.navbar_button_box}>
-        <Button
-          sx={styles.button_login_client}
-          onClick={handleLoginServiceSeeker}
-        >
-          I need Care
-        </Button>
-        <Button
-          sx={styles.button_login_provider}
-          onClick={handleLoginServiceProvider}
-        >
-          I'm PSW
-        </Button>
+        {!loggedIn ? (
+          <>
+            <Button
+              sx={styles.button_outline}
+              onClick={() => router.push("/loginServiceSeeker")}
+            >
+              I need Care
+            </Button>
+
+            <Button
+              sx={styles.button_filled}
+              onClick={() => router.push("/loginServiceProvider")}
+            >
+              I'm PSW
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              sx={{
+                ...styles.button_outline,
+                border: "none",
+                "&:hover": {
+                  border: "none",
+                },
+              }}
+            ></Button>
+
+            <Button sx={styles.button_filled} onClick={handleLogout}>
+              Logout
+            </Button>
+          </>
+        )}
       </Box>
     </Box>
   );

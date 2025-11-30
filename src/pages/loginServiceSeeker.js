@@ -92,7 +92,7 @@ function LoginServiceSeeker() {
       setEmail("");
       setPassword("");
 
-      router.push("/chatbot");
+      router.push("/dashboard_service_seeker");
     } catch (err) {
       setError("An unexpected error occurred");
       console.log("error", err);

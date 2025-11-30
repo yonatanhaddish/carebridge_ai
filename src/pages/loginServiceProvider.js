@@ -89,7 +89,7 @@ function LoginServiceProvider() {
       }
       setEmail("");
       setPassword("");
-      router.push("/chatbot");
+      router.push("/dashboard_service_provider");
     } catch (err) {
       setError("An unexpected error occurred");
       console.log("error", err);
