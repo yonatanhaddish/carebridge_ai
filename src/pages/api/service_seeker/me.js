@@ -24,15 +24,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const provider = await ServiceSeeker.findOne({ user_id: user.user_id });
+    const seeker = await ServiceSeeker.findOne({ user_id: user.user_id });
 
-    if (!provider) {
+    if (!seeker) {
       return res.status(404).json({ error: "ServiceSeeker not found" });
     }
 
     res.status(200).json({
       success: true,
-      service_provider: provider || [],
+      service_seeker: seeker || [],
     });
   } catch (err) {
     console.error("Fetch LoggedIn User Error:", err);

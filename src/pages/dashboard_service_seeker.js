@@ -1,97 +1,144 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  CircularProgress,
+} from "@mui/material";
 import axios from "axios";
 
-export default function SeekerBooking() {
+export default function BookingPage() {
   const [command, setCommand] = useState("");
-  const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
-  // ✅ Get logged-in user's location
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await axios.get(
-          `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/me`
-        );
-
-        const user = res.data;
-
-        const location = {
-          home_address: user.service_provider.home_address,
-          postal_code: user.service_provider.postal_code,
-          location_latitude: user.service_provider.location_latitude,
-          location_longitude: user.service_provider.location_longitude,
-        };
-        setUserLocation(location);
-        setLoggedInUser(user.service_provider);
-      } catch (err) {
-        console.error("Failed to fetch user location", err);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!command) return alert("Please enter a request");
-    if (!userLocation) return alert("User location not loaded yet");
-
+  // NOTE: You must be logged in for the getUserFromRequest helper to work.
+  // This assumes the user has a valid 'token' cookie set.
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
-    setResponse(null);
-
-    console.log("111", userLocation);
+    setResult(null);
+    setError(null);
 
     try {
-      // ✅ step 1: send BOTH command + userLocation to AI
-      const parseRes = await axios.post("/api/ai/parseServiceSeekerCommand", {
+      // Calls the main booking API handler
+      const response = await axios.post("/api/service_seeker/booking", {
         command,
-        userLocation,
       });
 
-      const parsedRequest = parseRes.data.parsed;
-      console.log("FINAL parsed request:", parsedRequest);
-
-      // ✅ step 2: send AI output to booking API
-      // const bookingRes = await axios.post("/api/service_seeker/booking", {
-      //   request: parsedRequest,
-      // });
-
-      // setResponse(bookingRes.data);
+      setResult(response.data);
     } catch (err) {
-      console.error(err);
-      setResponse({ error: err.response?.data || err.message });
+      console.error(
+        "Booking failed:",
+        err.response ? err.response.data : err.message
+      );
+      setError(
+        err.response
+          ? err.response.data.message ||
+              err.response.data.error ||
+              "An unknown error occurred."
+          : "Network error."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: 20 }}>
-      <h2>Service Seeker Booking</h2>
+    <Box sx={{ p: 4, maxWidth: 800, margin: "auto" }}>
+      <Typography variant="h4" gutterBottom>
+        CareBridge AI Booking
+      </Typography>
+      <Typography variant="body1" color="text.secondary" gutterBottom>
+        Enter your service request (e.g., "I need a Level 2 PSW every Wednesday
+        next month from 10 AM to 2 PM at 123 Main St, Toronto.").
+      </Typography>
 
-      <textarea
-        rows={4}
-        style={{ width: "100%", padding: 10 }}
-        placeholder='E.g: "Book me a Level 2 caregiver every Monday and Thursday 10am-2pm from Feb 10 to March 20"'
-        value={command}
-        onChange={(e) => setCommand(e.target.value)}
-      />
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, mb: 4 }}>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          label="Service Command"
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          variant="outlined"
+          required
+          disabled={loading}
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          sx={{ mt: 2 }}
+          disabled={loading || command.trim() === ""}
+        >
+          {loading ? (
+            <CircularProgress size={24} color="inherit" />
+          ) : (
+            "Find & Book Care"
+          )}
+        </Button>
+      </Box>
 
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
-        style={{ marginTop: 10 }}
-      >
-        {loading ? "Processing..." : "Submit"}
-      </button>
-
-      {response && (
-        <pre style={{ marginTop: 20, background: "#f4f4f4", padding: 10 }}>
-          {JSON.stringify(response, null, 2)}
-        </pre>
+      {error && (
+        <Paper sx={{ p: 2, bgcolor: "error.light", color: "white" }}>
+          <Typography variant="h6">Error:</Typography>
+          <Typography>{error}</Typography>
+        </Paper>
       )}
-    </div>
+
+      {result && (
+        <Paper sx={{ p: 3, mt: 3 }}>
+          <Typography
+            variant="h5"
+            color={result.success ? "success.main" : "warning.main"}
+            gutterBottom
+          >
+            {result.message}
+          </Typography>
+          <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+            **Bookings Created (Pending):**{" "}
+            {result.summary.totalBookingsCreated}
+          </Typography>
+
+          {result.results.successful.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1">
+                Successful Requests ({result.results.successful.length}):
+              </Typography>
+              {result.results.successful.map((item, index) => (
+                <Paper
+                  key={index}
+                  sx={{ p: 1.5, mt: 1, borderLeft: "5px solid green" }}
+                >
+                  <Typography variant="body2">
+                    {item.entry.service_level} with **{item.provider.name}** (
+                    {item.bookings.length} slots)
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+          )}
+
+          {result.results.failed.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1" color="error.main">
+                Failed Requests ({result.results.failed.length}):
+              </Typography>
+              {result.results.failed.map((item, index) => (
+                <Typography key={index} color="error.main" variant="body2">
+                  - {item.entry.service_level} on {item.entry.start_date}:{" "}
+                  {item.reason}
+                </Typography>
+              ))}
+            </Box>
+          )}
+        </Paper>
+      )}
+    </Box>
   );
 }
