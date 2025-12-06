@@ -6,7 +6,7 @@ function Footer() {
   return (
     <Box
       sx={{
-        height: "5%",
+        height: "7%",
         backgroundColor: "#020E20",
         color: "#F7F7F7",
         display: "flex",
@@ -15,9 +15,7 @@ function Footer() {
         fontWeight: "bold",
       }}
     >
-      <Typography sx={{ fontSize: "14px" }}>
-        @2026 copyright CareBridge
-      </Typography>
+      <Typography sx={{ fontSize: "14px" }}>@2026 CareBridge</Typography>
     </Box>
   );
 }

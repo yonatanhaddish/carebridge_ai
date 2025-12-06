@@ -30,8 +30,6 @@ const recurringDaySchema = new mongoose.Schema({
 
 // Recurring booking block (same idea as provider)
 const recurringBookingSchema = new mongoose.Schema({
-  start_date: { type: Date, required: true },
-  end_date: { type: Date, required: true },
   recurring: [recurringDaySchema],
 });
 
@@ -65,11 +63,11 @@ const bookingSchema = new mongoose.Schema({
   price: { type: Number, required: true },
 
   // For one-time bookings
-  start_datetime: { type: Date },
-  end_datetime: { type: Date },
+  start_date: { type: Date },
+  end_date: { type: Date },
 
   // For recurring bookings
-  recurring_booking: recurringBookingSchema, // OPTIONAL
+  recurring: [recurringDaySchema], // OPTIONAL
 
   status: {
     type: String,
@@ -91,6 +89,12 @@ const bookingSchema = new mongoose.Schema({
   location_postal_code: { type: String },
   location_latitude: { type: Number },
   location_longitude: { type: Number },
+});
+
+// Automatically update last_updated_at on save
+bookingSchema.pre("save", function (next) {
+  this.last_updated_at = new Date();
+  next();
 });
 
 // Export

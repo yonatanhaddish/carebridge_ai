@@ -195,8 +195,8 @@ function LoginServiceSeeker() {
           </Box>
         </Box>
       </Box>
-
-      <Footer />
+      {/* 
+      <Footer /> */}
     </Box>
   );
 }

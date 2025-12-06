@@ -1,5 +1,5 @@
 // pages/dashboard_service_provider_cal.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Box,
@@ -30,6 +30,19 @@ export default function AvailabiltiyCalendar() {
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [showCalendarUpdate, setShowCalendarUpdate] = useState(false);
+
+  useEffect(() => {
+    if (availability.length > 0) {
+      setShowCalendarUpdate(true);
+
+      const timer = setTimeout(() => {
+        setShowCalendarUpdate(false);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [availability]);
 
   // --- Local conflict check ---
   const localConflictCheck = (newSlot) =>
@@ -215,10 +228,10 @@ export default function AvailabiltiyCalendar() {
         )}
 
         {/* Already Added Availability */}
-        {availability.length > 0 && (
+        {showCalendarUpdate && availability.length > 0 && (
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
-              Current Availability
+              Calendar Updated
             </Typography>
             {Object.entries(groupedAvailability).map(([date, slots]) => (
               <Card key={date} variant="outlined" sx={{ mb: 2 }}>

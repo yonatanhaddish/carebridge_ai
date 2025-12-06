@@ -8,7 +8,7 @@ function LandingPage() {
   const styles = {
     landing_page_box: {
       // border: "solid red 2px",
-      height: "87%",
+      height: "85%",
       backgroundColor: "#e0e0e0",
       display: "flex",
       flexDirection: { xs: "column-reverse", md: "row" }, // stack on mobile, side-by-side on desktop
@@ -64,7 +64,7 @@ function LandingPage() {
       width: { xs: "100%", sm: "40%" },
       color: "#020e20",
       "&:hover": {
-        // backgroundColor: "#4749df",
+        backgroundColor: "#e0e0e0",
         border: "2px solid #4749df",
         transition: "all 0.25s ease",
         color: "#020e20",

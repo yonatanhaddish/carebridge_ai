@@ -186,7 +186,7 @@ function LoginServiceProvider() {
         </Box>
       </Box>
 
-      <Footer />
+      {/* <Footer /> */}
     </Box>
   );
 }

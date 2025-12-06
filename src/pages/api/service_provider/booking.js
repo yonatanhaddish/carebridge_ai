@@ -9,7 +9,11 @@ function getUserFromRequest(req) {
   const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
   const token = cookies.token;
   if (!token) return null;
-  return verifyToken(token);
+  try {
+    return verifyToken(token);
+  } catch {
+    return null;
+  }
 }
 
 // --- Time helpers ---
@@ -23,6 +27,39 @@ function timeOverlaps(slot1, slot2) {
     Math.max(toMinutes(slot1.start), toMinutes(slot2.start)) <
     Math.min(toMinutes(slot1.end), toMinutes(slot2.end))
   );
+}
+
+// --- Safe local date parser ---
+function safeDate(dateInput) {
+  if (!dateInput) throw new Error("safeDate received invalid value");
+
+  // If it's already a Date, return a new Date at local noon
+  if (dateInput instanceof Date) {
+    return new Date(
+      dateInput.getFullYear(),
+      dateInput.getMonth(),
+      dateInput.getDate(),
+      12,
+      0,
+      0
+    );
+  }
+
+  // If it's a string in YYYY-MM-DD, parse normally
+  if (typeof dateInput === "string") {
+    const [year, month, day] = dateInput.split("-").map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0);
+  }
+
+  throw new Error("safeDate received invalid type: " + typeof dateInput);
+}
+
+function normalizeDate(dateStr) {
+  const d = safeDate(dateStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function datesOverlap(start1, end1, start2, end2) {
@@ -40,80 +77,102 @@ async function parseAI(command) {
   return res.data.parsed;
 }
 
-// --- Data Validation and Normalization ---
-function normalizeScheduleEntries(parsedEntries) {
-  return parsedEntries.map((entry) => {
-    // Normalize dates to ensure consistent format
-    const normalizedEntry = {
-      start_date: new Date(entry.start_date).toISOString(),
-      end_date: new Date(entry.end_date).toISOString(),
-    };
+// --- Generate recurring schedule based on date range ---
+function generateRecurringFromRange(entry) {
+  const daysOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const start = safeDate(entry.start_date);
+  const end = safeDate(entry.end_date);
+  const time_slots = entry.recurring?.[0]?.time_slots || [];
+  const recurringMap = {};
 
-    // Normalize recurring array structure
-    if (Array.isArray(entry.recurring)) {
-      normalizedEntry.recurring = entry.recurring.map((daySchedule) => ({
-        day: daySchedule.day,
-        time_slots: Array.isArray(daySchedule.time_slots)
-          ? daySchedule.time_slots.map((slot) => ({
-              start: slot.start,
-              end: slot.end,
-            }))
-          : [],
-      }));
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dayName = daysOfWeek[d.getDay()];
+    if (!recurringMap[dayName]) {
+      recurringMap[dayName] = {
+        day: dayName,
+        time_slots: JSON.parse(JSON.stringify(time_slots)),
+      };
     }
+  }
 
-    return normalizedEntry;
-  });
+  return Object.values(recurringMap);
 }
 
-// --- Improved Conflict Detection ---
+// --- Normalize schedule entries ---
+function normalizeScheduleEntries(parsedEntries) {
+  return parsedEntries.map((entry) => ({
+    start_date: normalizeDate(entry.start_date),
+    end_date: normalizeDate(entry.end_date),
+    recurring: generateRecurringFromRange(entry),
+  }));
+}
+
+// --- Check if a day exists in a date range ---
+function checkDayInDateRange(day, startDate, endDate) {
+  const daysOfWeekMap = {
+    Sunday: 0,
+    Monday: 1,
+    Tuesday: 2,
+    Wednesday: 3,
+    Thursday: 4,
+    Friday: 5,
+    Saturday: 6,
+  };
+  const targetDay = daysOfWeekMap[day];
+  if (targetDay === undefined) return false;
+
+  const current = safeDate(startDate);
+  const end = safeDate(endDate);
+
+  while (current <= end) {
+    if (current.getDay() === targetDay) return true;
+    current.setDate(current.getDate() + 1);
+  }
+  return false;
+}
+
+// --- Conflict detection ---
 function detectConflicts(newEntries, existingEntries) {
   const conflicts = [];
 
   newEntries.forEach((newEntry) => {
-    const newStart = new Date(newEntry.start_date);
-    const newEnd = new Date(newEntry.end_date);
+    const newStart = safeDate(newEntry.start_date);
+    const newEnd = safeDate(newEntry.end_date);
 
     existingEntries.forEach((existing) => {
-      const existStart = new Date(existing.start_date);
-      const existEnd = new Date(existing.end_date);
+      const existStart = safeDate(existing.start_date);
+      const existEnd = safeDate(existing.end_date);
 
-      // Check if dates overlap at all
       if (datesOverlap(newStart, newEnd, existStart, existEnd)) {
-        // Calculate the actual overlapping date range
         const overlapStart = new Date(Math.max(newStart, existStart));
         const overlapEnd = new Date(Math.min(newEnd, existEnd));
 
-        console.log("Date overlap found:", {
-          newRange: `${newStart.toISOString()} to ${newEnd.toISOString()}`,
-          existingRange: `${existStart.toISOString()} to ${existEnd.toISOString()}`,
-          overlapRange: `${overlapStart.toISOString()} to ${overlapEnd.toISOString()}`,
-        });
+        let timeConflictFound = false;
 
-        // Check for recurring schedule conflicts only within the overlapping date range
         if (
           Array.isArray(newEntry.recurring) &&
           Array.isArray(existing.recurring)
         ) {
-          newEntry.recurring.forEach((newRec) => {
-            existing.recurring.forEach((existRec) => {
+          for (const newRec of newEntry.recurring) {
+            for (const existRec of existing.recurring) {
               if (newRec.day === existRec.day) {
-                // Check if this specific day falls within the overlapping date range
-                const dayOverlaps = checkDayInDateRange(
-                  newRec.day,
-                  overlapStart,
-                  overlapEnd
-                );
-
-                if (dayOverlaps) {
-                  // Same day and within overlapping date range, check time slots
-                  newRec.time_slots.forEach((newSlot) => {
-                    existRec.time_slots.forEach((existSlot) => {
+                if (checkDayInDateRange(newRec.day, overlapStart, overlapEnd)) {
+                  for (const newSlot of newRec.time_slots) {
+                    for (const existSlot of existRec.time_slots) {
                       if (timeOverlaps(newSlot, existSlot)) {
+                        timeConflictFound = true;
                         conflicts.push({
                           type: "time_conflict",
                           message: `Time conflict on ${newRec.day}`,
-                          details: `Your requested time ${newSlot.start}-${
+                          details: `Requested ${newSlot.start}-${
                             newSlot.end
                           } overlaps with existing ${existSlot.start}-${
                             existSlot.end
@@ -124,16 +183,15 @@ function detectConflicts(newEntries, existingEntries) {
                           conflictDateRange: `${overlapStart.toLocaleDateString()} - ${overlapEnd.toLocaleDateString()}`,
                         });
                       }
-                    });
-                  });
+                    }
+                  }
                 }
               }
-            });
-          });
+            }
+          }
         }
 
-        // If no time conflicts found but dates overlap, it's a date range conflict
-        if (conflicts.length === 0) {
+        if (!timeConflictFound) {
           conflicts.push({
             type: "date_range_conflict",
             message: "Date range conflict",
@@ -150,35 +208,7 @@ function detectConflicts(newEntries, existingEntries) {
   return conflicts;
 }
 
-// --- Helper to check if a specific day falls within a date range ---
-function checkDayInDateRange(day, startDate, endDate) {
-  const daysOfWeek = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
-  const dayIndex = daysOfWeek.indexOf(day);
-
-  if (dayIndex === -1) return false;
-
-  // Check if this day exists at least once in the date range
-  const current = new Date(startDate);
-  const end = new Date(endDate);
-
-  while (current <= end) {
-    if (current.getDay() === dayIndex) {
-      return true;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  return false;
-}
-
+// ==================== HANDLER ====================
 export default async function handler(req, res) {
   await dbConnect();
 
@@ -196,93 +226,54 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Command required" });
   }
 
-  // Parse command using AI
   let parsed;
   try {
     parsed = await parseAI(command);
   } catch (err) {
-    console.error("AI Parsing Error:", err);
-    return res.status(500).json({
-      error: "AI failed to parse command",
-      details: err.message,
-    });
+    console.error("AI Parsing Error:", { err });
+    return res.status(500).json({ error: "AI failed to parse command" });
   }
 
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    return res.status(400).json({
-      error: "Parsed AI schedule is empty or invalid",
-    });
+    return res
+      .status(400)
+      .json({ error: "Parsed AI schedule is empty or invalid" });
   }
 
   try {
-    // Normalize the data
     const normalizedEntries = normalizeScheduleEntries(parsed);
 
-    // Get current service provider data
     const provider = await ServiceProvider.findOne({ user_id: user.user_id });
     if (!provider) {
       return res.status(404).json({ error: "ServiceProvider not found" });
     }
 
-    console.log("=== DEBUG INFO ===");
-    console.log(
-      "New entries to add:",
-      JSON.stringify(normalizedEntries, null, 2)
-    );
-    console.log(
-      "Existing entries count:",
-      provider.availability_calendar.length
-    );
-    console.log(
-      "Existing entries:",
-      JSON.stringify(provider.availability_calendar, null, 2)
-    );
-
-    // Check for conflicts
     const conflicts = detectConflicts(
       normalizedEntries,
       provider.availability_calendar
     );
 
-    console.log("Detected conflicts:", conflicts.length);
-    conflicts.forEach((conflict, index) => {
-      console.log(`Conflict ${index + 1}:`, conflict);
-    });
-
-    // If conflicts found, return notification without updating database
     if (conflicts.length > 0) {
       return res.status(200).json({
         success: false,
         message: "Schedule conflicts detected",
-        conflicts: conflicts,
+        conflicts,
         notification: {
           type: "error",
           title: "Schedule Conflict",
-          message: `Found ${conflicts.length} conflict(s) with your existing schedule`,
+          message: `Found ${conflicts.length} conflict(s)`,
         },
-        added: [], // No entries added due to conflicts
+        added: [],
         totalAvailabilityEntries: provider.availability_calendar.length,
-        debug: {
-          newEntries: normalizedEntries,
-          existingEntriesCount: provider.availability_calendar.length,
-        },
       });
     }
 
-    // No conflicts found - update the database
     const updatedProvider = await ServiceProvider.findOneAndUpdate(
       { user_id: user.user_id },
-      {
-        $push: {
-          availability_calendar: {
-            $each: normalizedEntries,
-          },
-        },
-      },
+      { $push: { availability_calendar: { $each: normalizedEntries } } },
       { new: true, runValidators: true }
     );
 
-    // Success response
     return res.status(200).json({
       success: true,
       message: `Successfully added ${normalizedEntries.length} schedule ${
@@ -297,10 +288,7 @@ export default async function handler(req, res) {
       },
     });
   } catch (err) {
-    console.error("Database Update Error:", err);
-    return res.status(500).json({
-      error: "Failed to update availability",
-      details: err.message,
-    });
+    console.error("Database Update Error:", { err });
+    return res.status(500).json({ error: "Failed to update availability" });
   }
 }

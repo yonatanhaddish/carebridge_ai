@@ -44,25 +44,28 @@ function Navbar() {
       width: "100%",
       backgroundColor: "#d9d9d9",
       borderBottom: "1px solid #e0e0e0",
-      flexDirection: { xs: "column", sm: "row" },
+      // flexDirection: { xs: "column", sm: "row" },
       gap: { xs: 2, sm: 0 },
+      // border: "solid red 1px",
     },
     navbar_logo_box: {
       display: "flex",
       alignItems: "center",
       gap: 1,
       color: "#4749df",
-      width: { xs: "100%", sm: "200px" },
-      // justifyContent: { xs: "center", sm: "flex-start" },
+      width: { xs: "40%", sm: "200px" },
+      justifyContent: { xs: "center", sm: "flex-start" },
       cursor: "pointer",
+      // border: "solid red 1px",
     },
     navbar_button_box: {
       display: "flex",
       alignItems: "center",
       gap: { xs: 2, sm: 2 },
-      width: { xs: "100%", sm: "350px" },
+      width: { xs: "40%", sm: "350px" },
       justifyContent: { xs: "center", sm: "space-between" },
       flexDirection: { xs: "column", sm: "row" },
+      pb: { xs: 3, sm: 0 },
     },
     navbar_logo_icon: {
       fontSize: { xs: 28, md: 38 },
@@ -78,8 +81,8 @@ function Navbar() {
       width: { xs: "100%", sm: "45%" },
       color: "#020e20",
       "&:hover": {
-        backgroundColor: "#4749df",
-        color: "#f7f7f7",
+        backgroundColor: "#e0e0e0",
+        border: "2px solid #4749df",
       },
     },
     button_filled: {
@@ -88,7 +91,9 @@ function Navbar() {
       color: "#f7f7f7",
       backgroundColor: "#4749df",
       "&:hover": {
-        backgroundColor: "#020e20",
+        "&:hover": {
+          transform: "scale(1.05)",
+        },
       },
     },
   };

@@ -225,7 +225,7 @@ function SignupServiceProvider() {
         </Box>
       </Box>
 
-      <Footer />
+      {/* <Footer /> */}
     </Box>
   );
 }

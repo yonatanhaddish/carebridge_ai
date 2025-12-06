@@ -1,6 +1,5 @@
-// pages/api/serviceseeker/booking.js - COMPLETE AND FIXED CODE
-
 import dbConnect from "../../../lib/mongoose";
+import mongoose from "mongoose";
 import ServiceProvider from "../../../models/ServiceProvider";
 import Booking from "../../../models/Booking";
 import ServiceSeeker from "../../../models/ServiceSeeker";
@@ -30,25 +29,11 @@ function distanceKm(lat1, lon1, lat2, lon2) {
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
-  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function datesOverlap(start1, end1, start2, end2) {
-  return !(
-    new Date(end1) <= new Date(start2) || new Date(start1) >= new Date(end2)
-  );
-}
-
-// --- CORE AVAILABILITY CHECKERS ---
-
-/**
- * Checks if the requested schedule fits into the provider's recurring availability calendar.
- * (Logic maintained from previous version)
- */
+// --- CHECK PROVIDER AVAILABILITY ---
 function checkProviderAvailability(provider, entry) {
-  const { start_date, end_date, recurring } = entry;
-
-  // Check if provider offers this service level
   if (!provider.service_levels_offered.includes(entry.service_level)) {
     return {
       available: false,
@@ -56,23 +41,6 @@ function checkProviderAvailability(provider, entry) {
     };
   }
 
-  // Check distance if coordinates available
-  if (provider.location_latitude && entry.location?.location_latitude) {
-    const dist = distanceKm(
-      entry.location.location_latitude,
-      entry.location.location_longitude,
-      provider.location_latitude,
-      provider.location_longitude
-    );
-    if (dist > 30) {
-      return {
-        available: false,
-        reason: `Provider is ${dist.toFixed(2)} km away (max 30km)`,
-      };
-    }
-  }
-
-  // Check availability calendar
   if (
     !provider.availability_calendar ||
     provider.availability_calendar.length === 0
@@ -83,420 +51,269 @@ function checkProviderAvailability(provider, entry) {
     };
   }
 
-  const entryStart = new Date(start_date);
-  const entryEnd = new Date(end_date);
+  const entryStart = new Date(entry.start_date);
+  const entryEnd = new Date(entry.end_date);
 
-  // Find availability blocks that overlap with requested dates
   const overlappingBlocks = provider.availability_calendar.filter((block) => {
     const blockStart = new Date(block.start_date);
     const blockEnd = new Date(block.end_date);
-    return datesOverlap(entryStart, entryEnd, blockStart, blockEnd);
+    return entryStart >= blockStart && entryEnd <= blockEnd;
   });
 
   if (overlappingBlocks.length === 0) {
     return {
       available: false,
-      reason: "Provider not available during requested dates",
+      reason: "No availability block covers the requested date range",
     };
   }
 
-  // For single day booking
-  if (entryStart.getTime() === entryEnd.getTime()) {
-    const dayName = entryStart.toLocaleDateString("en-US", { weekday: "long" });
-    const timeSlots = recurring?.[0]?.time_slots || [];
+  for (const reqDay of entry.recurring) {
+    const dayName = reqDay.day;
+    const timeSlots = reqDay.time_slots || [];
+    let dayAvailable = false;
 
-    // Check each availability block
     for (const block of overlappingBlocks) {
-      if (block.recurring && Array.isArray(block.recurring)) {
-        const daySchedule = block.recurring.find((r) => r.day === dayName);
-        if (daySchedule && daySchedule.time_slots) {
-          // Check if requested time slots fit within available slots
-          for (const reqSlot of timeSlots) {
-            const fits = daySchedule.time_slots.some(
-              (availSlot) =>
-                toMinutes(reqSlot.start) >= toMinutes(availSlot.start) &&
-                toMinutes(reqSlot.end) <= toMinutes(availSlot.end)
-            );
-            if (!fits) {
-              return {
-                available: false,
-                reason: `Time ${reqSlot.start}-${reqSlot.end} not available on ${dayName}`,
-              };
-            }
-          }
-          // All time slots fit!
-          return {
-            available: true,
-            block,
-            daySchedule,
-            distance:
-              provider.location_latitude && entry.location?.location_latitude
-                ? distanceKm(
-                    entry.location.location_latitude,
-                    entry.location.location_longitude,
-                    provider.location_latitude,
-                    provider.location_longitude
-                  ).toFixed(2)
-                : null,
-          };
+      const daySchedule = block.recurring.find((r) => r.day === dayName);
+      if (daySchedule && daySchedule.time_slots) {
+        const allSlotsFit = timeSlots.every((reqSlot) =>
+          daySchedule.time_slots.some(
+            (availSlot) =>
+              toMinutes(reqSlot.start) >= toMinutes(availSlot.start) &&
+              toMinutes(reqSlot.end) <= toMinutes(availSlot.end)
+          )
+        );
+        if (allSlotsFit) {
+          dayAvailable = true;
+          break;
         }
       }
     }
-    return { available: false, reason: `No availability on ${dayName}` };
-  }
 
-  // For recurring multi-day booking
-  if (recurring && recurring.length > 0) {
-    // Check each requested day
-    for (const reqDay of recurring) {
-      const dayName = reqDay.day;
-      const timeSlots = reqDay.time_slots || [];
-
-      let dayAvailable = false;
-
-      for (const block of overlappingBlocks) {
-        if (block.recurring && Array.isArray(block.recurring)) {
-          const daySchedule = block.recurring.find((r) => r.day === dayName);
-          if (daySchedule && daySchedule.time_slots) {
-            // Check each time slot for this day
-            for (const reqSlot of timeSlots) {
-              const fits = daySchedule.time_slots.some(
-                (availSlot) =>
-                  toMinutes(reqSlot.start) >= toMinutes(availSlot.start) &&
-                  toMinutes(reqSlot.end) <= toMinutes(availSlot.end)
-              );
-              if (!fits) {
-                return {
-                  available: false,
-                  reason: `Time ${reqSlot.start}-${reqSlot.end} not available on ${dayName}`,
-                };
-              }
-            }
-            dayAvailable = true;
-            break;
-          }
-        }
-      }
-
-      if (!dayAvailable) {
-        return { available: false, reason: `No availability on ${dayName}` };
-      }
+    if (!dayAvailable) {
+      return { available: false, reason: `Time slot conflict on ${dayName}` };
     }
-
-    // All days available!
-    return {
-      available: true,
-      distance:
-        provider.location_latitude && entry.location?.location_latitude
-          ? distanceKm(
-              entry.location.location_latitude,
-              entry.location.location_longitude,
-              provider.location_latitude,
-              provider.location_longitude
-            ).toFixed(2)
-          : null,
-    };
   }
 
-  return { available: false, reason: "Invalid schedule format" };
+  return { available: true };
 }
 
-// NOTE: checkExistingBookingConflicts was removed from this version and replaced
-// by a simplified check in the main loop to match the uploaded file's structure.
-// If conflict checking is required, it must be re-implemented here.
+// --- CHECK EXISTING BOOKINGS ---
+async function checkExistingBookingConflicts(provider, entry, seeker) {
+  const existingBookings = await Booking.find({
+    service_provider_id: provider.service_provider_id,
+    status: { $in: ["Pending", "Confirmed"] },
+  }).lean();
 
-// --- CREATE BOOKINGS FOR ENTRY ---
-async function createBookingsForEntry(provider, entry, seeker) {
-  const bookings = [];
-  const { start_date, end_date, recurring, service_level } = entry;
+  for (const reqDay of entry.recurring) {
+    const dayName = reqDay.day;
+    const timeSlots = reqDay.time_slots || [];
 
-  const startDate = new Date(start_date);
-  const endDate = new Date(end_date);
-  const isSingleDay = startDate.getTime() === endDate.getTime();
-
-  if (isSingleDay) {
-    // Single day booking
-    const dayName = startDate.toLocaleDateString("en-US", { weekday: "long" });
-    const timeSlots = recurring?.[0]?.time_slots || [
-      { start: "09:00", end: "17:00" },
-    ];
-
-    for (const timeSlot of timeSlots) {
-      // NOTE: Using UTC ISO format to prevent time zone date shift issues
-      const dateStr = startDate.toISOString().split("T")[0];
-      const bookingStart = new Date(`${dateStr}T${timeSlot.start}:00Z`);
-      const bookingEnd = new Date(`${dateStr}T${timeSlot.end}:00Z`);
-
-      const booking = await Booking.create({
-        service_provider_id: provider.service_provider_id,
-        service_seeker_id: seeker.service_seeker_id,
-        service_level: service_level,
-        price: provider.service_prices?.get(service_level) || 99.99,
-        start_datetime: bookingStart,
-        end_datetime: bookingEnd,
-        status: "Pending",
-
-        // 🟢 FIX: Added location_postal_code to match schema
-        location_address: entry.location.home_address,
-        location_postal_code: entry.location.postal_code,
-        location_latitude: entry.location.location_latitude,
-        location_longitude: entry.location.location_longitude,
-
-        request_created_at: new Date(),
-        confirmation_deadline: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours
-      });
-
-      bookings.push(booking);
-    }
-  } else {
-    // Multi-day recurring booking
-    const currentDate = new Date(startDate);
-
-    while (currentDate <= endDate) {
-      const dayName = currentDate.toLocaleDateString("en-US", {
-        weekday: "long",
-      });
-      const daySchedule = recurring?.find((r) => r.day === dayName);
-
-      if (daySchedule && daySchedule.time_slots) {
-        for (const timeSlot of daySchedule.time_slots) {
-          // NOTE: Using UTC ISO format to prevent time zone date shift issues
-          const dateStr = currentDate.toISOString().split("T")[0];
-          const bookingStart = new Date(`${dateStr}T${timeSlot.start}:00Z`);
-          const bookingEnd = new Date(`${dateStr}T${timeSlot.end}:00Z`);
-
-          const booking = await Booking.create({
-            service_provider_id: provider.service_provider_id,
-            service_seeker_id: seeker.service_seeker_id,
-            service_level: service_level,
-            price: provider.service_prices?.get(service_level) || 99.99,
-            start_datetime: bookingStart,
-            end_datetime: bookingEnd,
-            status: "Pending",
-
-            // 🟢 FIX: Added location_postal_code to match schema
-            location_address: entry.location.home_address,
-            location_postal_code: entry.location.postal_code,
-            location_latitude: entry.location.location_latitude,
-            location_longitude: entry.location.location_longitude,
-
-            request_created_at: new Date(),
-            confirmation_deadline: new Date(Date.now() + 12 * 60 * 60 * 1000),
-          });
-
-          bookings.push(booking);
+    for (const booking of existingBookings) {
+      if (!booking.recurring) continue;
+      const matchedDay = booking.recurring.find((r) => r.day === dayName);
+      if (matchedDay) {
+        for (const slot of timeSlots) {
+          for (const existingSlot of matchedDay.time_slots) {
+            const overlap =
+              toMinutes(slot.start) < toMinutes(existingSlot.end) &&
+              toMinutes(slot.end) > toMinutes(existingSlot.start);
+            if (overlap) {
+              let reason = `Conflict on ${dayName} during ${slot.start}-${slot.end}`;
+              if (booking.service_seeker_id === seeker.service_seeker_id) {
+                reason = `Duplicate request with same provider on ${dayName}, ${slot.start}-${slot.end}`;
+              }
+              return { hasConflict: true, reason };
+            }
+          }
         }
       }
-
-      // Move to next day
-      currentDate.setDate(currentDate.getDate() + 1);
     }
   }
 
-  return bookings;
+  return { hasConflict: false };
+}
+
+// --- HELPER: GENERATE RECURRING ARRAY FROM DATE RANGE ---
+// --- Safe UTC date parser ---
+function safeUTCDate(dateStr) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)); // noon UTC to avoid timezone issues
+}
+
+// --- Generate recurring array from date range (UTC-aware) ---
+function generateRecurringFromRange(entry) {
+  const daysOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  const start = safeUTCDate(entry.start_date);
+  const end = safeUTCDate(entry.end_date);
+  const time_slots = entry.recurring?.[0]?.time_slots || [];
+
+  const recurringArray = [];
+  const current = new Date(start);
+  const finalEnd = new Date(end);
+  finalEnd.setUTCDate(finalEnd.getUTCDate() + 1); // make end date inclusive
+
+  while (current < finalEnd) {
+    recurringArray.push({
+      day: daysOfWeek[current.getUTCDay()],
+      time_slots: JSON.parse(JSON.stringify(time_slots)),
+    });
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return recurringArray;
+}
+
+// --- CREATE SINGLE BOOKING WITH RECURSION ---
+async function createBookingWithRecursion(provider, entry, seeker, session) {
+  const bookingDoc = {
+    service_provider_id: provider.service_provider_id,
+    service_seeker_id: seeker.service_seeker_id,
+    service_level: entry.service_level,
+    price: provider.service_prices?.[entry.service_level] || 0,
+    start_date: entry.start_date,
+    end_date: entry.end_date,
+    recurring: generateRecurringFromRange(entry),
+    status: "Pending",
+    location_address: entry.location.home_address,
+    location_postal_code: entry.location.postal_code,
+    location_latitude: entry.location.location_latitude,
+    location_longitude: entry.location.location_longitude,
+    request_created_at: new Date(),
+    confirmation_deadline: new Date(Date.now() + 12 * 60 * 60 * 1000),
+  };
+
+  const created = await Booking.create([bookingDoc], { session });
+  return created[0];
 }
 
 // --- MAIN HANDLER ---
 export default async function handler(req, res) {
   await dbConnect();
 
-  if (req.method !== "POST") {
+  if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
-  }
 
   const user = getUserFromRequest(req);
-  if (!user) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
+  if (!user) return res.status(401).json({ error: "Not authenticated" });
 
   const { command } = req.body;
-  if (!command || typeof command !== "string") {
-    return res.status(400).json({ error: "Valid command required" });
-  }
+  if (!command) return res.status(400).json({ error: "Command required" });
 
-  console.log("Processing booking command:", command);
+  const seeker = await ServiceSeeker.findOne({ user_id: user.user_id }).lean();
+  if (!seeker)
+    return res.status(404).json({ error: "Service seeker not found" });
 
-  // Get service seeker
-  const seeker = await ServiceSeeker.findOne({ user_id: user.user_id });
-  if (!seeker) {
-    return res.status(404).json({ error: "Service seeker profile not found" });
-  }
-
-  // Parse command using AI
   let parsedEntries;
   try {
     const aiRes = await axios.post(
       `${process.env.NEXT_PUBLIC_BASE_URL}/api/ai/parseServiceSeekerCommand`,
-      {
-        command,
-        userLocation: {
-          home_address: seeker.home_address,
-          postal_code: seeker.postal_code,
-          location_latitude: seeker.location_latitude,
-          location_longitude: seeker.location_longitude,
-        },
-      }
+      { command, userLocation: seeker }
     );
-
-    if (!aiRes.data.success || !Array.isArray(aiRes.data.parsed)) {
-      throw new Error("Invalid AI response format");
-    }
-
-    parsedEntries = aiRes.data.parsed;
-    console.log("Parsed entries:", JSON.stringify(parsedEntries, null, 2));
+    parsedEntries = aiRes.data.parsed || [];
   } catch (err) {
     console.error("AI Parsing Error:", err);
-    return res.status(500).json({
-      error: "Failed to parse command",
-      details: err.message,
-    });
+    return res
+      .status(500)
+      .json({ error: "Failed to parse command", details: err.message });
   }
 
-  const results = {
-    successful: [],
-    failed: [],
-    totalBookingsCreated: 0,
-  };
+  const results = { successful: [], failed: [], totalBookingsCreated: 0 };
 
-  // Process each entry
   for (const entry of parsedEntries) {
-    console.log(
-      `Processing entry: ${entry.service_level} from ${entry.start_date} to ${entry.end_date}`
-    );
-
-    // Find all providers offering this service level
     const providers = await ServiceProvider.find({
       service_levels_offered: entry.service_level,
-    });
+    }).lean();
 
-    console.log(
-      `Found ${providers.length} providers for ${entry.service_level}`
-    );
+    const providersWithDistance = providers
+      .map((p) => ({
+        provider: p,
+        distance: distanceKm(
+          seeker.location_latitude,
+          seeker.location_longitude,
+          p.location_latitude,
+          p.location_longitude
+        ),
+      }))
+      .filter((p) => p.distance <= 30)
+      .sort((a, b) => a.distance - b.distance);
 
-    let providerBooked = null;
-    let bookingResult = null;
+    let booked = null;
 
-    // Try each provider (sorted by distance)
-    const providersWithDistance = await Promise.all(
-      providers.map(async (provider) => {
-        const dist =
-          provider.location_latitude && entry.location?.location_latitude
-            ? distanceKm(
-                entry.location.location_latitude,
-                entry.location.location_longitude,
-                provider.location_latitude,
-                provider.location_longitude
-              )
-            : Infinity;
+    for (const { provider } of providersWithDistance) {
+      const availability = checkProviderAvailability(provider, entry);
+      if (!availability.available) continue;
 
-        return { provider, distance: dist };
-      })
-    );
-
-    // Sort by distance
-    providersWithDistance.sort((a, b) => a.distance - b.distance);
-
-    for (const { provider, distance } of providersWithDistance) {
-      console.log(
-        `Checking provider: ${provider.first_name} ${
-          provider.last_name
-        } (${distance.toFixed(2)} km)`
+      const conflictCheck = await checkExistingBookingConflicts(
+        provider,
+        entry,
+        seeker
       );
+      if (conflictCheck.hasConflict) {
+        results.failed.push({ entry, reason: conflictCheck.reason });
+        booked = "duplicate";
+        break;
+      }
 
-      // Check availability
-      const availability = await checkProviderAvailability(provider, entry);
+      const session = await mongoose.startSession();
+      session.startTransaction();
 
-      if (availability.available) {
-        console.log(`Provider ${provider.first_name} is available!`);
+      try {
+        const booking = await createBookingWithRecursion(
+          provider,
+          entry,
+          seeker,
+          session
+        );
+        await session.commitTransaction();
+        session.endSession();
 
-        // NOTE: A separate conflict check function (checkExistingBookingConflicts)
-        // would typically go here, but since it was omitted in your last file,
-        // the logic proceeds straight to booking.
-
-        // 5. Create Bookings (as Pending)
-        try {
-          const bookings = await createBookingsForEntry(
-            provider,
-            entry,
-            seeker
-          );
-
-          providerBooked = provider;
-          bookingResult = {
-            provider: {
-              id: provider.service_provider_id,
-              name: `${provider.first_name} ${provider.last_name}`,
-              distance: distance.toFixed(2),
-            },
-            entry: {
-              service_level: entry.service_level,
-              start_date: entry.start_date,
-              end_date: entry.end_date,
-              days: entry.recurring?.map((r) => r.day) || [],
-            },
-            bookings: bookings.map((b) => ({
-              id: b._id,
-              start: b.start_datetime,
-              end: b.end_datetime,
-              status: b.status,
-            })),
-            totalBookings: bookings.length,
-          };
-
-          results.totalBookingsCreated += bookings.length;
-          break; // Stop looking for more providers
-        } catch (err) {
-          // 🔴 FIX: Enhanced logging for Mongoose validation errors
-          console.error(
-            "Booking creation failed for provider",
-            provider.service_provider_id
-          );
-          console.error("Error Message:", err.message);
-          if (err.name === "ValidationError") {
-            console.error("Mongoose Validation Details:", err.errors);
-          } else {
-            console.error("Generic Error Stack:", err.stack);
-          }
-          continue; // Try next provider
-        }
-      } else {
-        console.log(`Provider not available: ${availability.reason}`);
+        booked = booking;
+        results.successful.push({
+          provider: {
+            id: provider.service_provider_id,
+            name: `${provider.first_name} ${provider.last_name}`,
+          },
+          entry,
+          bookingId: booking._id,
+        });
+        results.totalBookingsCreated += 1;
+        break;
+      } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        continue;
       }
     }
 
-    if (providerBooked && bookingResult) {
-      results.successful.push(bookingResult);
-    } else {
+    if (!booked) {
       results.failed.push({
         entry,
-        reason: "No available providers found for the requested schedule",
+        reason: "No provider available or conflict detected",
       });
     }
   }
 
-  // Prepare response
-  const response = {
+  res.status(200).json({
     success: results.successful.length > 0,
     message:
       results.successful.length === parsedEntries.length
-        ? "All bookings created successfully!"
-        : `Created ${results.successful.length} out of ${parsedEntries.length} requested bookings`,
-    results: results,
+        ? `✅ All requests booked successfully`
+        : `⚠️ Partial success: ${results.successful.length} of ${parsedEntries.length} requests booked`,
+    results,
     summary: {
       totalRequests: parsedEntries.length,
       successful: results.successful.length,
       failed: results.failed.length,
       totalBookingsCreated: results.totalBookingsCreated,
     },
-  };
-
-  if (results.failed.length > 0) {
-    response.warnings = results.failed.map((f) => ({
-      service_level: f.entry.service_level,
-      dates: `${f.entry.start_date} to ${f.entry.end_date}`,
-      reason: f.reason,
-    }));
-  }
-
-  res.status(200).json(response);
+  });
 }
