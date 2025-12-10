@@ -2,6 +2,7 @@ import dbConnect from "../../../lib/mongoose";
 import ServiceProvider from "../../../models/ServiceProvider";
 import cookie from "cookie";
 import { verifyToken } from "../../../lib/jwt";
+import { v4 as uuidv4 } from "uuid";
 
 // --- Get logged-in user from JWT cookie ---
 function getUserFromRequest(req) {
@@ -11,84 +12,76 @@ function getUserFromRequest(req) {
   return verifyToken(token);
 }
 
-// --- Helpers ---
-function toMinutes(t) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
+// --- Convert iCal date string to Date ---
+function parseICalDate(str) {
+  // Expects: 20251210T090000Z
+  const match = str.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+  if (!match) return null;
+  const [_, year, month, day, hour, minute, second] = match.map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 }
 
-function timeOverlaps(slot1, slot2) {
-  return (
-    Math.max(toMinutes(slot1.start), toMinutes(slot2.start)) <
-    Math.min(toMinutes(slot1.end), toMinutes(slot2.end))
-  );
+// --- Expand VEVENT into start/end occurrences ---
+function expandVEVENT(ical) {
+  const occurrences = [];
+  const dtStartMatch = ical.match(/DTSTART:(\d{8}T\d{6}Z)/);
+  const dtEndMatch = ical.match(/DTEND:(\d{8}T\d{6}Z)/);
+  if (!dtStartMatch || !dtEndMatch) return occurrences;
+
+  const start = parseICalDate(dtStartMatch[1]);
+  const end = parseICalDate(dtEndMatch[1]);
+  if (!start || !end) return occurrences;
+
+  occurrences.push({ start, end });
+  return occurrences;
 }
 
-// --- Normalize booking entries ---
-function normalizeBookingEntries(bookingData) {
-  const entries = Array.isArray(bookingData) ? bookingData : [bookingData];
-
-  return entries.map((entry) => ({
-    start_date: new Date(entry.start_date).toISOString(),
-    end_date: new Date(entry.end_date).toISOString(),
-    status: entry.status || "available",
-    booking_type: entry.booking_type || "availability",
-    recurring: Array.isArray(entry.recurring)
-      ? entry.recurring.map((daySchedule) => ({
-          day: daySchedule.day,
-          time_slots: Array.isArray(daySchedule.time_slots)
-            ? daySchedule.time_slots.map((slot) => ({
-                start: slot.start,
-                end: slot.end,
-              }))
-            : [],
-        }))
-      : [],
-  }));
-}
-
-// --- Conflict detection ---
-function detectBookingConflicts(newEntries, existingCalendar) {
+// --- Detect duplicates & conflicts based on start/end times only ---
+function detectConflicts(newICals, existingICals) {
   const conflicts = [];
+  const duplicates = [];
 
-  newEntries.forEach((newEntry) => {
-    const newStart = new Date(newEntry.start_date);
-    const newEnd = new Date(newEntry.end_date);
+  const normalize = (date) => date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
 
-    existingCalendar.forEach((existing) => {
-      const existStart = new Date(existing.start_date);
-      const existEnd = new Date(existing.end_date);
+  const newOccs = newICals.flatMap(expandVEVENT).map((o) => ({
+    start: normalize(o.start),
+    end: normalize(o.end),
+  }));
 
-      if (!(newEnd < existStart || newStart > existEnd)) {
-        if (
-          Array.isArray(newEntry.recurring) &&
-          Array.isArray(existing.recurring)
-        ) {
-          newEntry.recurring.forEach((newRec) => {
-            existing.recurring.forEach((existRec) => {
-              if (newRec.day === existRec.day) {
-                newRec.time_slots.forEach((newSlot) => {
-                  existRec.time_slots.forEach((existSlot) => {
-                    if (timeOverlaps(newSlot, existSlot)) {
-                      conflicts.push({
-                        type: "booking_conflict",
-                        message: `Conflict on ${newRec.day}`,
-                        requestedTime: `${newSlot.start}-${newSlot.end}`,
-                        existingTime: `${existSlot.start}-${existSlot.end}`,
-                        existingBookingType: existing.booking_type,
-                      });
-                    }
-                  });
-                });
-              }
-            });
-          });
-        }
+  const existingOccs = (existingICals || [])
+    .flatMap((e) => expandVEVENT(e.ical_string))
+    .map((o) => ({
+      start: normalize(o.start),
+      end: normalize(o.end),
+    }));
+
+  newOccs.forEach((n) => {
+    existingOccs.forEach((e) => {
+      // Exact duplicate
+      if (n.start === e.start && n.end === e.end) {
+        duplicates.push({
+          type: "duplicate",
+          message: `Duplicate slot: ${n.start} - ${n.end}`,
+        });
+      }
+      // Overlapping/conflict
+      else if (n.start < e.end && n.end > e.start) {
+        conflicts.push({
+          type: "conflict",
+          message: `Conflict with existing slot: ${n.start} - ${n.end}`,
+        });
       }
     });
   });
 
-  return conflicts;
+  return { conflicts, duplicates };
+}
+
+// --- Inject UUID into VEVENT ---
+function injectUUID(icalStrings) {
+  return icalStrings.map((ical) =>
+    ical.replace(/BEGIN:VEVENT/, `BEGIN:VEVENT\nUID:${uuidv4()}`)
+  );
 }
 
 // --- API handler ---
@@ -101,49 +94,67 @@ export default async function handler(req, res) {
   const user = getUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Not authenticated" });
 
-  const { bookingData, action = "add" } = req.body;
-  if (!bookingData)
-    return res.status(400).json({ error: "Booking data required" });
+  const { icalData, action = "add" } = req.body;
+  if (!icalData || !Array.isArray(icalData))
+    return res.status(400).json({ error: "iCal data array required" });
 
   try {
-    const normalizedEntries = normalizeBookingEntries(bookingData);
     const provider = await ServiceProvider.findOne({ user_id: user.user_id });
     if (!provider)
       return res.status(404).json({ error: "ServiceProvider not found" });
 
     if (action === "add") {
-      const conflicts = detectBookingConflicts(
-        normalizedEntries,
-        provider.availability_calendar
+      const { conflicts, duplicates } = detectConflicts(
+        icalData,
+        provider.ical_availability_entries
       );
+
+      if (duplicates.length > 0) {
+        return res.status(200).json({
+          success: false,
+          message: `${duplicates.length} duplicate slot(s) detected`,
+          duplicates,
+          added: [],
+          totalAvailabilityEntries: provider.ical_availability_entries.length,
+        });
+      }
 
       if (conflicts.length > 0) {
         return res.status(200).json({
           success: false,
-          message: "Booking conflicts detected",
+          message: `${conflicts.length} conflict(s) detected`,
           conflicts,
           added: [],
-          totalCalendarEntries: provider.availability_calendar.length,
+          totalAvailabilityEntries: provider.ical_availability_entries.length,
         });
       }
 
+      // Add UUIDs and save
+      const icalWithUUID = injectUUID(icalData);
+
       const updated = await ServiceProvider.findOneAndUpdate(
         { user_id: user.user_id },
-        { $push: { availability_calendar: { $each: normalizedEntries } } },
+        {
+          $push: {
+            ical_availability_entries: {
+              $each: icalWithUUID.map((s) => ({ ical_string: s })),
+            },
+          },
+        },
         { new: true, runValidators: true }
       );
 
       return res.status(200).json({
         success: true,
-        message: `Added ${normalizedEntries.length} slot(s) successfully!`,
-        added: normalizedEntries,
-        totalCalendarEntries: updated.availability_calendar.length,
+        message: `Added ${icalWithUUID.length} slot(s) successfully!`,
+        added: icalWithUUID.map((s) => ({ ical_string: s })),
+        totalAvailabilityEntries: updated.ical_availability_entries.length,
       });
     }
 
     return res.status(400).json({ error: "Invalid action" });
   } catch (err) {
-    console.error(err);
+    console.error("API Error:", err);
     return res
       .status(500)
       .json({ error: "Server error", details: err.message });

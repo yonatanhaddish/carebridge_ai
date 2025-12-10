@@ -3,35 +3,21 @@ import { v4 as uuidv4 } from "uuid";
 
 const serviceLevelsEnum = ["Level 1", "Level 2", "Level 3"];
 
-// Time slot schema
-const timeSlotSchema = new mongoose.Schema({
-  start: { type: String, required: true }, // "HH:mm"
-  end: { type: String, required: true }, // "HH:mm"
-});
-
-// Recurring day schema (for a date range)
-const recurringSchema = new mongoose.Schema({
-  day: {
+// Each availability rule is stored as a single iCal entry.
+const icalAvailabilitySchema = new mongoose.Schema({
+  ical_id: {
     type: String,
-    enum: [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-      "Sunday",
-    ],
-    required: true,
+    default: uuidv4,
   },
-  time_slots: [timeSlotSchema],
-});
-
-// Availability entry for a date range
-const availabilityEntrySchema = new mongoose.Schema({
-  start_date: { type: Date, required: true },
-  end_date: { type: Date, required: true },
-  recurring: [recurringSchema],
+  ical_string: {
+    type: String,
+    required: true, // Contains full VCALENDAR/VEVENT with RRULE
+  },
+  description: {
+    type: String,
+    default: "",
+  },
+  created_at: { type: Date, default: Date.now },
 });
 
 // Main ServiceProvider schema
@@ -43,10 +29,10 @@ const serviceProviderSchema = new mongoose.Schema({
     index: true,
   },
   user_id: {
-    type: String, // if you use User.user_id (UUID string)
+    type: String,
     required: true,
-    ref: "User", // reference to User model
-    unique: true, // one-to-one relation
+    ref: "User",
+    unique: true,
   },
   first_name: { type: String, required: true },
   last_name: { type: String, required: true },
@@ -56,6 +42,7 @@ const serviceProviderSchema = new mongoose.Schema({
   postal_code: { type: String, required: true, index: true },
   location_latitude: { type: Number, required: true },
   location_longitude: { type: Number, required: true },
+
   service_levels_offered: [
     {
       type: String,
@@ -63,19 +50,24 @@ const serviceProviderSchema = new mongoose.Schema({
       required: true,
     },
   ],
+
   service_prices: {
     type: Map,
     of: Number,
     required: true,
   },
-  availability_calendar: [availabilityEntrySchema],
+
+  // Replaces your entire old recurring availability system
+  ical_availability_entries: [icalAvailabilitySchema],
+
   booking_confirmation_deadline_hours: { type: Number, default: 12 },
   required_advance_notice_hours: { type: Number, default: 24 },
+
   profile_created_at: { type: Date, default: Date.now },
   last_updated_at: { type: Date, default: Date.now },
 });
 
-// Automatically update last_updated_at on save
+// Automatically update last_updated_at before save
 serviceProviderSchema.pre("save", function (next) {
   this.last_updated_at = new Date();
   next();

@@ -21,8 +21,9 @@ import {
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import { Delete as DeleteIcon, Add as AddIcon } from "@mui/icons-material";
+import { v4 as uuidv4 } from "uuid";
 
-export default function AvailabiltiyCalendar() {
+export default function AvailabilityCalendar() {
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [startTime, setStartTime] = useState(dayjs().hour(9).minute(0));
   const [endTime, setEndTime] = useState(dayjs().hour(17).minute(0));
@@ -30,21 +31,8 @@ export default function AvailabiltiyCalendar() {
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
-  const [showCalendarUpdate, setShowCalendarUpdate] = useState(false);
 
-  useEffect(() => {
-    if (availability.length > 0) {
-      setShowCalendarUpdate(true);
-
-      const timer = setTimeout(() => {
-        setShowCalendarUpdate(false);
-      }, 5000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [availability]);
-
-  // --- Local conflict check ---
+  // --- Local conflict check before adding ---
   const localConflictCheck = (newSlot) =>
     selectedSlots.some((slot) => {
       if (slot.date !== newSlot.date) return false;
@@ -55,19 +43,17 @@ export default function AvailabiltiyCalendar() {
       return !(newEnd <= existStart || newStart >= existEnd);
     });
 
-  // --- Add slot locally ---
   const handleAddSlot = () => {
     const newSlot = {
       date: selectedDate.format("YYYY-MM-DD"),
       start: startTime.format("HH:mm"),
       end: endTime.format("HH:mm"),
-      day: selectedDate.format("dddd"),
     };
 
     if (localConflictCheck(newSlot)) {
       setNotification({
         type: "error",
-        message: "Slot conflicts with current selection!",
+        message: "Slot conflicts with selection!",
       });
       return;
     }
@@ -75,28 +61,37 @@ export default function AvailabiltiyCalendar() {
     setSelectedSlots((prev) => [...prev, newSlot]);
   };
 
-  // --- Submit slots to server ---
+  // --- Convert slot to iCal VEVENT ---
+  const slotToICal = (slot) => {
+    const dtStart =
+      slot.date.replace(/-/g, "") + "T" + slot.start.replace(":", "") + "00Z";
+    const dtEnd =
+      slot.date.replace(/-/g, "") + "T" + slot.end.replace(":", "") + "00Z";
+    const uid = uuidv4();
+    return `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:${uid}
+DTSTART:${dtStart}
+DTEND:${dtEnd}
+END:VEVENT
+END:VCALENDAR`;
+  };
+
   const handleSubmitSlots = async () => {
     if (!selectedSlots.length) {
       setNotification({ type: "error", message: "No slots selected!" });
       return;
     }
+
     setLoading(true);
 
     try {
-      const bookingData = selectedSlots.map((slot) => ({
-        start_date: slot.date,
-        end_date: slot.date,
-        booking_type: "availability",
-        status: "available",
-        recurring: [
-          { day: slot.day, time_slots: [{ start: slot.start, end: slot.end }] },
-        ],
-      }));
+      const icalData = selectedSlots.map(slotToICal);
 
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/booking_calendar`,
-        { action: "add", bookingData }
+        { action: "add", icalData }
       );
 
       if (response.data.success) {
@@ -123,14 +118,12 @@ export default function AvailabiltiyCalendar() {
 
   const handleCloseNotification = () => setNotification(null);
 
-  // --- Group slots by date ---
-  const groupSlotsByDate = (slots) => {
-    return slots.reduce((acc, slot) => {
+  const groupSlotsByDate = (slots) =>
+    slots.reduce((acc, slot) => {
       if (!acc[slot.date]) acc[slot.date] = [];
       acc[slot.date].push(slot);
       return acc;
     }, {});
-  };
 
   const groupedSelected = groupSlotsByDate(selectedSlots);
   const groupedAvailability = groupSlotsByDate(availability);
@@ -138,30 +131,28 @@ export default function AvailabiltiyCalendar() {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ maxWidth: 900, mx: "auto", p: 3 }}>
-        <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+        <Typography variant="h4" gutterBottom>
           Availability Calendar
         </Typography>
 
         {/* Add Slot */}
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Add Time Slot
-          </Typography>
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
+          <Typography variant="h6">Add Time Slot</Typography>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 2 }}>
             <DatePicker
-              label="Date"
               value={selectedDate}
               onChange={setSelectedDate}
+              label="Date"
             />
             <TimePicker
-              label="Start Time"
               value={startTime}
               onChange={setStartTime}
+              label="Start Time"
             />
             <TimePicker
-              label="End Time"
               value={endTime}
               onChange={setEndTime}
+              label="End Time"
             />
             <Button
               variant="contained"
@@ -181,7 +172,7 @@ export default function AvailabiltiyCalendar() {
         {selectedSlots.length > 0 && (
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
-              Selected Slots (Local Check)
+              Selected Slots
             </Typography>
             {Object.entries(groupedSelected).map(([date, slots]) => (
               <Card key={date} variant="outlined" sx={{ mb: 2 }}>
@@ -221,17 +212,17 @@ export default function AvailabiltiyCalendar() {
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                "Submit All Slots"
+                "Submit Slots"
               )}
             </Button>
           </Paper>
         )}
 
         {/* Already Added Availability */}
-        {showCalendarUpdate && availability.length > 0 && (
+        {availability.length > 0 && (
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
-              Calendar Updated
+              Current Availability
             </Typography>
             {Object.entries(groupedAvailability).map(([date, slots]) => (
               <Card key={date} variant="outlined" sx={{ mb: 2 }}>
@@ -273,8 +264,8 @@ export default function AvailabiltiyCalendar() {
               <Box sx={{ mt: 1 }}>
                 {notification.conflicts.map((conflict, idx) => (
                   <Typography key={idx} variant="body2" color="error">
-                    • {conflict.message}: {conflict.requestedTime} conflicts
-                    with {conflict.existingTime}
+                    • {conflict.message}: {conflict.requestedStart} conflicts
+                    with {conflict.existingStart}
                   </Typography>
                 ))}
               </Box>

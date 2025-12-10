@@ -1,8 +1,27 @@
 import OpenAI from "openai";
+import { v4 as uuidv4 } from "uuid";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Helper: normalize a date string like "20260310T110000Z" or "20260310T110000" to UTC format
+function normalizeToUTC(dateStr) {
+  // Remove Z if present
+  let cleanStr = dateStr.replace(/Z$/, "");
+
+  // Parse components
+  const match = cleanStr.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
+  if (!match) throw new Error(`Invalid date format: ${dateStr}`);
+
+  const [_, year, month, day, hour, minute, second] = match.map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  // Format back to YYYYMMDDTHHMMSSZ
+  return date
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -10,62 +29,71 @@ export default async function handler(req, res) {
   }
 
   const { command } = req.body;
-
-  if (!command) {
-    return res.status(400).json({ error: "Command required" });
-  }
+  if (!command) return res.status(400).json({ error: "Command required" });
 
   try {
     const prompt = `
-Convert this natural language booking command into JSON focusing ONLY on schedule and availability.
+You are a converter that transforms natural language scheduling commands into valid iCal VEVENT entries.
 
-Command: "${command}"
+COMMAND:
+"${command}"
 
-Instructions:
-- Ignore names, participants, or purpose.
-- If the command mentions recurring days (e.g., "every Monday in January 2027"), output them as "recurring" entries with "day" and "time_slots".
-- If the command mentions a date range (e.g., "from Jan 5 to Feb 10"), include "start_date" and "end_date" in ISO format (YYYY-MM-DD).
-- If the command mentions multiple time blocks (e.g., Monday 3-7pm, Thursday 1-9pm), include each block under "recurring.time_slots".
-- If the command specifies a single date (e.g., "on March 15, 2027 from 10am to 2pm"), set both "start_date" and "end_date" to that date.
-- If the command mentions daily repetition (e.g., "every day from Jan 1 to Jan 10"), include all 7 days of the week in "recurring".
-- If the command mentions weekends or weekdays, expand them into the correct days ("Saturday" + "Sunday", or "Monday"-"Friday").
-- Times must always be in 24-hour format "HH:MM".
-- Only output valid JSON. No explanations.
+OUTPUT FORMAT:
+Return ONLY a JSON array of strings.
+Each string MUST be a complete VCALENDAR containing a single VEVENT.
 
-Return JSON in this format:
-[
-  {
-    "start_date": "YYYY-MM-DD",
-    "end_date": "YYYY-MM-DD",
-    "recurring": [
-      {
-        "day": "Monday",
-        "time_slots": [
-          { "start": "HH:MM", "end": "HH:MM" }
-        ]
-      },
-      {
-        "day": "Thursday",
-        "time_slots": [
-          { "start": "HH:MM", "end": "HH:MM" }
-        ]
-      }
-    ]
-  }
-]
-Only output valid JSON. No explanations.
+GENERAL RULES:
+- Only include dates, times, and recurrence.
+- All times MUST be in 24-hour format.
+- All DTSTART and DTEND MUST be full UTC format: YYYYMMDDTHHMMSSZ.
+- Multiple independent bookings → multiple VCALENDAR strings.
+- Replace {UUID} with a randomly generated UUIDv4.
+- Omit RRULE line if not recurring.
+- Return ONLY the JSON array.
 `;
 
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini", // or "gpt-4o" or "gpt-4.1"
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
     });
 
-    const text = response.choices[0].message.content.trim();
-    const parsed = JSON.parse(text);
+    let text = response.choices[0].message.content.trim();
 
-    res.json({ success: true, parsed });
+    // Extract JSON array
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON array found in model output.");
+
+    let parsed = JSON.parse(jsonMatch[0]);
+
+    // Inject UUIDs and normalize all DTSTART/DTEND to UTC
+    parsed = parsed.map((ical) => {
+      let result = ical.replace(/\{UUID\}/g, () => uuidv4());
+
+      // Normalize DTSTART
+      result = result.replace(
+        /DTSTART:(\d{8}T\d{6}Z?)/,
+        (_, dt) => `DTSTART:${normalizeToUTC(dt)}Z`
+      );
+      // Normalize DTEND
+      result = result.replace(
+        /DTEND:(\d{8}T\d{6}Z?)/,
+        (_, dt) => `DTEND:${normalizeToUTC(dt)}Z`
+      );
+
+      // Basic VCALENDAR structure validation
+      if (
+        !result.includes("BEGIN:VEVENT") ||
+        !result.includes("DTSTART") ||
+        !result.includes("DTEND")
+      ) {
+        throw new Error("Invalid iCal format detected.");
+      }
+
+      return result;
+    });
+
+    res.json({ success: true, ical: parsed });
   } catch (err) {
     console.error("AI Error:", err);
     res.status(500).json({
