@@ -34,14 +34,14 @@ import Offers from "@/components/Offers";
 import Schedule from "@/components/Schedule";
 
 function DashboardServiceProvider() {
-  const [selectedTab, setSelectedTab] = useState("dashboard");
+  const [selectedTab, setSelectedTab] = useState("availability_ai");
 
   const handleDataFromSideNavbar = (data) => {
     setSelectedTab(data);
   };
 
   return (
-    <Box sx={{ backgroundColor: "#e0e0e0", height: "100vh" }}>
+    <Box sx={{ backgroundColor: "#e0e0e0", minHeight: "100vh" }}>
       <Navbar />
       <SubNavbar sendDataToParent={handleDataFromSideNavbar} />
       {selectedTab === "dashboard" ? (

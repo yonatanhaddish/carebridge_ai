@@ -6,11 +6,7 @@ import {
   Typography,
   Paper,
   CircularProgress,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import axios from "axios";
 
 export default function BookingAI() {
@@ -124,44 +120,36 @@ export default function BookingAI() {
           </Typography>
 
           {result.results.successful.length > 0 && (
-            <Accordion sx={{ mt: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">
-                  Successful Requests ({result.results.successful.length})
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                {result.results.successful.map((item, index) => (
-                  <Paper
-                    key={index}
-                    sx={{ p: 1.5, mt: 1, borderLeft: "5px solid green" }}
-                  >
-                    <Typography variant="body2">
-                      {item.entry.service_level} with {item.provider.name} (
-                      {item.totalBookings} slots)
-                    </Typography>
-                  </Paper>
-                ))}
-              </AccordionDetails>
-            </Accordion>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1">
+                Successful Requests ({result.results.successful.length}):
+              </Typography>
+              {result.results.successful.map((item, index) => (
+                <Paper
+                  key={index}
+                  sx={{ p: 1.5, mt: 1, borderLeft: "5px solid green" }}
+                >
+                  <Typography variant="body2">
+                    {item.entry.service_level} with {item.provider.name} (
+                    {item.totalBookings} slots)
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
           )}
 
           {result.results.failed.length > 0 && (
-            <Accordion sx={{ mt: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1" color="error.main">
-                  Failed Requests ({result.results.failed.length})
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1" color="error.main">
+                Failed Requests ({result.results.failed.length}):
+              </Typography>
+              {result.results.failed.map((item, index) => (
+                <Typography key={index} color="error.main" variant="body2">
+                  - {item.entry.service_level} on {item.entry.start_date}:{" "}
+                  {item.reason}
                 </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                {result.results.failed.map((item, index) => (
-                  <Typography key={index} color="error.main" variant="body2">
-                    - {item.entry.service_level} on {item.entry.start_date}:{" "}
-                    {item.reason}
-                  </Typography>
-                ))}
-              </AccordionDetails>
-            </Accordion>
+              ))}
+            </Box>
           )}
         </Paper>
       )}

@@ -1,4 +1,4 @@
-import React, { use, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -6,8 +6,17 @@ import {
   CircularProgress,
   Chip,
   Button,
+  Stack,
+  Card,
+  CardContent,
+  CardActions,
+  Divider,
+  Grid,
 } from "@mui/material";
 import axios from "axios";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import PersonIcon from "@mui/icons-material/Person";
 
 // Proper date formatting
 const formatUTCtoLocalCalendarDate = (dateString) => {
@@ -19,18 +28,17 @@ const formatUTCtoLocalCalendarDate = (dateString) => {
   )}-${String(date.getUTCDate()).padStart(2, "0")}`;
 };
 
-export default function Offers() {
+export default function MyBookingSS({ sendBookingDataToParent }) {
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
   const [cancelLoadingId, setCancelLoadingId] = useState(null);
-  const [seeker, setSeeker] = useState({});
 
   const fetchBookings = async () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/bookings`
       );
       setBookings(response.data.bookings || []);
     } catch (err) {
@@ -49,23 +57,8 @@ export default function Offers() {
   }, []);
 
   useEffect(() => {
-    if (bookings.length > 0) {
-      bookings.forEach(async (booking) => {
-        try {
-          const response = await axios.get(
-            `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/${booking.service_seeker_id}`
-          );
-          setSeeker((prev) => ({
-            ...prev,
-            [booking.service_seeker_id]: response.data.seeker,
-          }));
-        } catch (err) {
-          console.error("Failed to fetch seeker data:", err);
-        }
-      });
-    }
-  }, [bookings]);
-  console.log("555", seeker);
+    sendBookingDataToParent(bookings);
+  }, [bookings, sendBookingDataToParent]);
 
   const handleCancel = async (bookingId) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
@@ -115,11 +108,11 @@ export default function Offers() {
   return (
     <Box sx={{ p: 4, maxWidth: 900, margin: "auto" }}>
       <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
-        My Offers
+        My Bookings
       </Typography>
 
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        View, manage, and cancel your offers.
+        View, manage, and cancel your bookings.
       </Typography>
 
       {loading && (
@@ -204,49 +197,42 @@ export default function Offers() {
               {/* Provider & Status */}
               <Box sx={{ mb: 2 }}>
                 <Typography sx={{ fontWeight: "600" }}>
-                  Client:
+                  Provider:
                   <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {seeker[booking.service_seeker_id]?.first_name}{" "}
-                    {seeker[booking.service_seeker_id]?.last_name}
+                    {booking.provider?.name || "Unassigned / Pending"}
                   </span>
                 </Typography>
-                <Typography sx={{ fontWeight: "600" }}>
-                  Address:
-                  <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {seeker[booking.service_seeker_id]?.home_address}
-                  </span>
-                </Typography>
-                <Typography sx={{ fontWeight: "600" }}>
-                  Phone Number:
-                  <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {seeker[booking.service_seeker_id]?.phone_number}
-                  </span>
-                </Typography>
+
+                <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                  <Typography sx={{ fontWeight: "600", mr: 1 }}>
+                    Status:
+                  </Typography>
+
+                  <Chip
+                    label={booking.status}
+                    sx={{
+                      fontWeight: "600",
+                      borderRadius: "16px",
+                      px: 1.5,
+                      backgroundColor:
+                        booking.status.toLowerCase() === "pending"
+                          ? "#ffeeba"
+                          : booking.status.toLowerCase().includes("cancel")
+                          ? "#f8d7da"
+                          : "#d4edda",
+                      color:
+                        booking.status.toLowerCase() === "pending"
+                          ? "#856404"
+                          : booking.status.toLowerCase().includes("cancel")
+                          ? "#721c24"
+                          : "#155724",
+                    }}
+                  />
+                </Box>
               </Box>
+
               {/* Cancel Button */}
-              <Box
-                sx={{ mt: 2, display: "flex", justifyContent: "space-around" }}
-              >
-                <Button
-                  variant="contained"
-                  color="error"
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: "600",
-                    px: 3,
-                    py: 1,
-                    borderRadius: "10px",
-                    width: "180px",
-                  }}
-                  onClick={() => handleCancel(booking.booking_id)}
-                  disabled={cancelLoadingId === booking.booking_id}
-                >
-                  {cancelLoadingId === booking._id ? (
-                    <CircularProgress size={20} sx={{ color: "white" }} />
-                  ) : (
-                    "Cancel Booking"
-                  )}
-                </Button>
+              <Box sx={{ mt: 2, textAlign: "right" }}>
                 <Button
                   variant="contained"
                   color="error"

@@ -31,11 +31,17 @@ function SubNavbarSeeker({ sendDataToParent }) {
   return (
     <Box sx={styles.subnavbar_parent}>
       <Box sx={styles.subnavbar_sub_parent}>
-        <Box onClick={() => handleClick("booking_ai")}>
-          <Typography sx={styles.typo}>Booking AI</Typography>
+        {/* <Box onClick={() => handleClick("dashboard")}>
+          <Typography sx={styles.typo}>Dashboard</Typography>
+        </Box> */}
+        <Box onClick={() => handleClick("my_booking")}>
+          <Typography sx={styles.typo}>My Booking</Typography>
         </Box>
-        <Box onClick={() => handleClick("my_schedule")}>
-          <Typography sx={styles.typo}>My schedule</Typography>
+        <Box onClick={() => handleClick("add_booking")}>
+          <Typography sx={styles.typo}>Add Booking</Typography>
+        </Box>
+        <Box onClick={() => handleClick("calendar")}>
+          <Typography sx={styles.typo}>Calendar</Typography>
         </Box>
       </Box>
     </Box>
