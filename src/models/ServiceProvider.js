@@ -81,5 +81,19 @@ serviceProviderSchema.pre("save", function (next) {
   next();
 });
 
+// Automatically update last_updated_at on findOneAndUpdate, updateOne, updateMany
+function setUpdatedAt(next) {
+  const update = this.getUpdate();
+  if (update) {
+    if (!update.$set) update.$set = {};
+    update.$set.last_updated_at = new Date();
+  }
+  next();
+}
+
+serviceProviderSchema.pre("findOneAndUpdate", setUpdatedAt);
+serviceProviderSchema.pre("updateOne", setUpdatedAt);
+serviceProviderSchema.pre("updateMany", setUpdatedAt);
+
 export default mongoose.models.ServiceProvider ||
   mongoose.model("ServiceProvider", serviceProviderSchema);

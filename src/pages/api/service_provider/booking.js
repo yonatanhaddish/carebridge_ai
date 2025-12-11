@@ -29,39 +29,37 @@ function timeOverlaps(slot1, slot2) {
   );
 }
 
-// --- Safe local date parser ---
-function safeDate(dateInput) {
-  if (!dateInput) throw new Error("safeDate received invalid value");
+// --- Parse YYYY-MM-DD into local Date at midnight ---
+function parseISOToLocal(dateInput) {
+  if (!dateInput) throw new Error("Invalid date input");
 
-  // If it's already a Date, return a new Date at local noon
+  // If it's already a Date object, just return a new Date at local midnight
   if (dateInput instanceof Date) {
     return new Date(
       dateInput.getFullYear(),
       dateInput.getMonth(),
-      dateInput.getDate(),
-      12,
-      0,
-      0
+      dateInput.getDate()
     );
   }
 
-  // If it's a string in YYYY-MM-DD, parse normally
+  // If it's a string in YYYY-MM-DD format
   if (typeof dateInput === "string") {
     const [year, month, day] = dateInput.split("-").map(Number);
-    return new Date(year, month - 1, day, 12, 0, 0);
+    return new Date(year, month - 1, day); // local midnight
   }
 
-  throw new Error("safeDate received invalid type: " + typeof dateInput);
+  throw new Error("parseISOToLocal received invalid type: " + typeof dateInput);
 }
 
 function normalizeDate(dateStr) {
-  const d = safeDate(dateStr);
+  const d = parseISOToLocal(dateStr);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
+// --- Date range overlap check ---
 function datesOverlap(start1, end1, start2, end2) {
   return !(
     new Date(end1) < new Date(start2) || new Date(start1) > new Date(end2)
@@ -88,17 +86,21 @@ function generateRecurringFromRange(entry) {
     "Friday",
     "Saturday",
   ];
-  const start = safeDate(entry.start_date);
-  const end = safeDate(entry.end_date);
-  const time_slots = entry.recurring?.[0]?.time_slots || [];
+  const start = parseISOToLocal(entry.start_date);
+  const end = parseISOToLocal(entry.end_date);
   const recurringMap = {};
+
+  if (!Array.isArray(entry.recurring)) return [];
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const dayName = daysOfWeek[d.getDay()];
+    const matchingRec = entry.recurring.find((r) => r.day === dayName);
+    if (!matchingRec) continue;
+
     if (!recurringMap[dayName]) {
       recurringMap[dayName] = {
         day: dayName,
-        time_slots: JSON.parse(JSON.stringify(time_slots)),
+        time_slots: JSON.parse(JSON.stringify(matchingRec.time_slots)),
       };
     }
   }
@@ -129,8 +131,8 @@ function checkDayInDateRange(day, startDate, endDate) {
   const targetDay = daysOfWeekMap[day];
   if (targetDay === undefined) return false;
 
-  const current = safeDate(startDate);
-  const end = safeDate(endDate);
+  const current = parseISOToLocal(startDate);
+  const end = parseISOToLocal(endDate);
 
   while (current <= end) {
     if (current.getDay() === targetDay) return true;
@@ -144,12 +146,12 @@ function detectConflicts(newEntries, existingEntries) {
   const conflicts = [];
 
   newEntries.forEach((newEntry) => {
-    const newStart = safeDate(newEntry.start_date);
-    const newEnd = safeDate(newEntry.end_date);
+    const newStart = parseISOToLocal(newEntry.start_date);
+    const newEnd = parseISOToLocal(newEntry.end_date);
 
     existingEntries.forEach((existing) => {
-      const existStart = safeDate(existing.start_date);
-      const existEnd = safeDate(existing.end_date);
+      const existStart = parseISOToLocal(existing.start_date);
+      const existEnd = parseISOToLocal(existing.end_date);
 
       if (datesOverlap(newStart, newEnd, existStart, existEnd)) {
         const overlapStart = new Date(Math.max(newStart, existStart));
