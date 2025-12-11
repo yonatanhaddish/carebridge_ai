@@ -4,11 +4,9 @@ import cookie from "cookie";
 import axios from "axios";
 import { verifyToken } from "../../../lib/jwt";
 import { v4 as uuidv4 } from "uuid";
-import { rrulestr } from "rrule";
+import { rrulestr, RRule } from "rrule";
 
-// =========================================================================
-// --- 1. UTILITIES --------------------------------------------------------
-// =========================================================================
+// ------------------- UTILS -------------------
 
 // Parse logged-in user from JWT cookie
 function getUserFromRequest(req) {
@@ -22,7 +20,7 @@ function getUserFromRequest(req) {
   }
 }
 
-// Convert date string to UTC Date object
+// Convert date string YYYYMMDDTHHMMSSZ to JS Date
 function parseUTC(dateStr) {
   const match = dateStr.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
   if (!match) throw new Error(`Invalid UTC format: ${dateStr}`);
@@ -30,7 +28,10 @@ function parseUTC(dateStr) {
   return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 }
 
-// Expand a VEVENT (including RRULE) to actual occurrences
+// Map JS getDay() to iCal BYDAY codes
+const JS_DAY_TO_ICAL = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+
+// Expand VEVENT to all occurrences
 function expandVEVENT(ical) {
   const occurrences = [];
 
@@ -42,31 +43,27 @@ function expandVEVENT(ical) {
   const dtEnd = parseUTC(dtEndMatch[1]);
   const duration = dtEnd.getTime() - dtStart.getTime();
 
-  const rruleMatches = ical.match(/RRULE:[^\n]+/g);
-  if (!rruleMatches) {
+  const rruleMatch = ical.match(/RRULE:([^\n]+)/);
+  if (!rruleMatch) {
     occurrences.push({ start: dtStart, end: dtEnd });
   } else {
-    rruleMatches.forEach((r) => {
-      const rule = rrulestr(r.replace("RRULE:", ""), { dtstart: dtStart });
-      rule
-        .all()
-        .forEach((d) =>
-          occurrences.push({ start: d, end: new Date(d.getTime() + duration) })
-        );
-    });
+    const rule = rrulestr(rruleMatch[1], { dtstart: dtStart });
+    rule
+      .all()
+      .forEach((d) =>
+        occurrences.push({ start: d, end: new Date(d.getTime() + duration) })
+      );
   }
 
   return occurrences;
 }
 
-// Check for time overlap
+// Detect overlap
 function hasOverlap(newOcc, existingOcc) {
   return newOcc.start < existingOcc.end && newOcc.end > existingOcc.start;
 }
 
-// =========================================================================
-// --- 2. MAIN API HANDLER -------------------------------------------------
-// =========================================================================
+// ------------------- MAIN API HANDLER -------------------
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -82,6 +79,7 @@ export default async function handler(req, res) {
 
   let parsedICal;
   try {
+    // Ask AI to parse the command into iCal events
     const aiRes = await axios.post(
       `${process.env.NEXT_PUBLIC_BASE_URL}/api/ai/parseServiceProviderCommand`,
       { command }
@@ -98,7 +96,7 @@ export default async function handler(req, res) {
       .json({ error: "Parsed AI schedule is empty or invalid" });
 
   try {
-    // Inject UUIDs
+    // Inject UUIDs into each VEVENT
     const icalWithUUIDs = parsedICal.map((ical) =>
       ical.replace(/BEGIN:VEVENT/, `BEGIN:VEVENT\nUID:${uuidv4()}`)
     );
@@ -116,7 +114,7 @@ export default async function handler(req, res) {
       provider.ical_availability_entries || []
     ).flatMap((e) => expandVEVENT(e.ical_string));
 
-    // Detect duplicates/conflicts
+    // Check for conflicts
     const nonConflictingICal = [];
     const conflicts = [];
 

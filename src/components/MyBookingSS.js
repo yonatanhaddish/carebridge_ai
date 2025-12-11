@@ -165,7 +165,11 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                     color: "#1976d2",
                   }}
                 >
-                  {booking.price} CAD / hr
+                  <p>
+                    {booking.price?.$numberDecimal
+                      ? parseFloat(booking.price.$numberDecimal).toFixed(2)
+                      : booking.price || "0.00"}
+                  </p>
                 </Typography>
               </Box>
 

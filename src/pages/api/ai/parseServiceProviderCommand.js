@@ -7,16 +7,12 @@ const client = new OpenAI({
 
 // Helper: normalize a date string like "20260310T110000Z" or "20260310T110000" to UTC format
 function normalizeToUTC(dateStr) {
-  // Remove Z if present
   let cleanStr = dateStr.replace(/Z$/, "");
-
-  // Parse components
   const match = cleanStr.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
   if (!match) throw new Error(`Invalid date format: ${dateStr}`);
 
-  const [_, year, month, day, hour, minute, second] = match.map(Number);
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
   const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  // Format back to YYYYMMDDTHHMMSSZ
   return date
     .toISOString()
     .replace(/[-:]/g, "")

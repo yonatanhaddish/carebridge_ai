@@ -43,6 +43,7 @@ export default function BookingAI() {
       setLoading(false);
     }
   };
+  console.log("777", result);
 
   return (
     <Box
