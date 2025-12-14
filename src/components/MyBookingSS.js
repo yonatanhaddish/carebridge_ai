@@ -19,14 +19,22 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import PersonIcon from "@mui/icons-material/Person";
 
 // Proper date formatting
-const formatUTCtoLocalCalendarDate = (dateString) => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")}`;
-};
+import { format, parseISO } from "date-fns";
+
+/**
+ * Convert UTC ISO string to local formatted string
+ * @param {string|Date} utcDateStr - UTC ISO string
+ * @param {string} fmt - optional date-fns format string
+ */
+export function formatUTCtoLocalCalendarDate(
+  utcDateStr,
+  fmt = "yyyy-MM-dd HH:mm"
+) {
+  if (!utcDateStr) return "";
+  const date =
+    typeof utcDateStr === "string" ? parseISO(utcDateStr) : utcDateStr;
+  return format(date, fmt); // uses local timezone automatically
+}
 
 export default function MyBookingSS({ sendBookingDataToParent }) {
   const [loading, setLoading] = useState(true);
@@ -67,8 +75,8 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
     setCancelLoadingId(bookingId);
 
     try {
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/bookings/${bookingId}`
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/bookings/cancel/${bookingId}`
       );
       fetchBookings();
     } catch (err) {
@@ -165,7 +173,9 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                     color: "#1976d2",
                   }}
                 >
-                  {booking.price} CAD / hr
+                  <p>
+                    Price: {parseFloat(booking.price.toString()).toFixed(2)}
+                  </p>
                 </Typography>
               </Box>
 
@@ -175,8 +185,23 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                   Dates
                 </Typography>
                 <Typography sx={{ color: "#555" }}>
-                  {formatUTCtoLocalCalendarDate(booking.start_date)} →{" "}
-                  {formatUTCtoLocalCalendarDate(booking.end_date)}
+                  {formatUTCtoLocalCalendarDate(
+                    booking.start_datetime,
+                    "dd MMMM yyyy"
+                  )}{" "}
+                  →{" "}
+                  {formatUTCtoLocalCalendarDate(
+                    booking.end_datetime,
+                    "dd MMMM yyyy"
+                  )}
+                </Typography>
+                <Typography sx={{ color: "#555" }}>
+                  {formatUTCtoLocalCalendarDate(
+                    booking.start_datetime,
+                    "HH:mm"
+                  )}{" "}
+                  →{" "}
+                  {formatUTCtoLocalCalendarDate(booking.end_datetime, "HH:mm")}
                 </Typography>
               </Box>
 

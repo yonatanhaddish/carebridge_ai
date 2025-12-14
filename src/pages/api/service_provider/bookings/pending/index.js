@@ -1,8 +1,8 @@
-import dbConnect from "../../../../lib/mongoose";
-import Booking from "../../../../models/Booking";
-import ServiceProvider from "../../../../models/ServiceProvider";
+import dbConnect from "../../../../../lib/mongoose";
+import Booking from "../../../../../models/Booking";
+import ServiceProvider from "../../../../../models/ServiceProvider";
 import cookie from "cookie";
-import { verifyToken } from "../../../../lib/jwt";
+import { verifyToken } from "../../../../../lib/jwt";
 
 // Get logged-in user from JWT
 function getUserFromRequest(req) {

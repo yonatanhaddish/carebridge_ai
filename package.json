@@ -24,6 +24,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.19",
     "groq-sdk": "^0.37.0",
+    "ical-generator": "^10.0.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.555.0",
     "mongoose": "^8.20.1",

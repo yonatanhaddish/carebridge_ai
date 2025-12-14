@@ -115,11 +115,11 @@ export default function BookingAI() {
             {result.message}
           </Typography>
 
-          <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+          {/* <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
             Bookings Created (Pending): {result.summary.totalBookingsCreated}
-          </Typography>
+          </Typography> */}
 
-          {result.results.successful.length > 0 && (
+          {/* {result.results.successful.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle1">
                 Successful Requests ({result.results.successful.length}):
@@ -136,9 +136,9 @@ export default function BookingAI() {
                 </Paper>
               ))}
             </Box>
-          )}
+          )} */}
 
-          {result.results.failed.length > 0 && (
+          {/* {result.results.failed.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle1" color="error.main">
                 Failed Requests ({result.results.failed.length}):
@@ -150,7 +150,7 @@ export default function BookingAI() {
                 </Typography>
               ))}
             </Box>
-          )}
+          )} */}
         </Paper>
       )}
     </Box>

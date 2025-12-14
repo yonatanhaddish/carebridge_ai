@@ -1,7 +1,7 @@
-import dbConnect from "../../../../lib/mongoose";
-import Booking from "../../../../models/Booking";
+import dbConnect from "../../../../../lib/mongoose";
+import Booking from "../../../../../models/Booking";
 import cookie from "cookie";
-import { verifyToken } from "../../../../lib/jwt";
+import { verifyToken } from "../../../../../lib/jwt";
 
 function getUserFromRequest(req) {
   const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
@@ -18,9 +18,7 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
 
-  if (req.method === "DELETE") {
-    console.log("555", id);
-
+  if (req.method === "POST") {
     try {
       const booking = await Booking.findOne({
         booking_id: id,
@@ -28,10 +26,10 @@ export default async function handler(req, res) {
 
       if (!booking) return res.status(404).json({ error: "Booking not found" });
 
-      booking.status = "Cancelled";
+      booking.status = "Rejected";
       await booking.save();
 
-      res.status(200).json({ success: true, message: "Booking cancelled" });
+      res.status(200).json({ success: true, message: "Booking rejected" });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -39,7 +37,6 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Method not allowed" });
   }
 }
-
 // import dbConnect from "../../../../lib/mongoose";
 // import Booking from "../../../../models/Booking";
 // import cookie from "cookie";

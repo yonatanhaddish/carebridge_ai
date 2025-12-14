@@ -10,14 +10,22 @@ import {
 import axios from "axios";
 
 // Proper date formatting
-const formatUTCtoLocalCalendarDate = (dateString) => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")}`;
-};
+import { format, parseISO } from "date-fns";
+
+/**
+ * Convert UTC ISO string to local formatted string
+ * @param {string|Date} utcDateStr - UTC ISO string
+ * @param {string} fmt - optional date-fns format string
+ */
+export function formatUTCtoLocalCalendarDate(
+  utcDateStr,
+  fmt = "yyyy-MM-dd HH:mm"
+) {
+  if (!utcDateStr) return "";
+  const date =
+    typeof utcDateStr === "string" ? parseISO(utcDateStr) : utcDateStr;
+  return format(date, fmt); // uses local timezone automatically
+}
 
 export default function Offers() {
   const [loading, setLoading] = useState(true);
@@ -30,7 +38,7 @@ export default function Offers() {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/pending`
       );
       setBookings(response.data.bookings || []);
     } catch (err) {
@@ -65,30 +73,51 @@ export default function Offers() {
       });
     }
   }, [bookings]);
-  console.log("555", seeker);
+  // console.log("555", seeker);
 
-  const handleCancel = async (bookingId) => {
+  const handleRejectOffer = async (bookingId) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
-    console.log("111", bookingId);
+    // console.log("111", bookingId);
 
     setCancelLoadingId(bookingId);
 
+    console.log("bookingId", bookingId);
+    console.log("cancelLoadingId", cancelLoadingId);
+
     try {
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/bookings/${bookingId}`
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/reject/${bookingId}`
       );
       fetchBookings();
     } catch (err) {
       alert(
         err.response?.data?.message ||
           err.response?.data?.error ||
-          "Failed to cancel booking."
+          "Failed to reject offer."
+      );
+    }
+  };
+  const handleAcceptOffer = async (bookingId) => {
+    if (!confirm("Are you sure you want to accept this booking?")) return;
+    // console.log("111", bookingId);
+    setCancelLoadingId(bookingId);
+    console.log("bookingId", bookingId);
+    console.log("cancelLoadingId", cancelLoadingId);
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/accept/${bookingId}`
+      );
+      fetchBookings();
+    } catch (err) {
+      alert(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to accept offer."
       );
     } finally {
       setCancelLoadingId(null);
     }
   };
-  console.log("333", bookings);
 
   const statusColor = (status) => {
     const value = status?.toLowerCase();
@@ -182,8 +211,23 @@ export default function Offers() {
                   Dates
                 </Typography>
                 <Typography sx={{ color: "#555" }}>
-                  {formatUTCtoLocalCalendarDate(booking.start_date)} →{" "}
-                  {formatUTCtoLocalCalendarDate(booking.end_date)}
+                  {formatUTCtoLocalCalendarDate(
+                    booking.start_datetime,
+                    "yyyy-MM-dd"
+                  )}{" "}
+                  →{" "}
+                  {formatUTCtoLocalCalendarDate(
+                    booking.end_datetime,
+                    "yyyy-MM-dd"
+                  )}
+                </Typography>
+                <Typography sx={{ color: "#555" }}>
+                  {formatUTCtoLocalCalendarDate(
+                    booking.start_datetime,
+                    "HH:mm"
+                  )}{" "}
+                  →{" "}
+                  {formatUTCtoLocalCalendarDate(booking.end_datetime, "HH:mm")}
                 </Typography>
               </Box>
 
@@ -229,7 +273,6 @@ export default function Offers() {
               >
                 <Button
                   variant="contained"
-                  color="error"
                   sx={{
                     textTransform: "none",
                     fontWeight: "600",
@@ -237,14 +280,15 @@ export default function Offers() {
                     py: 1,
                     borderRadius: "10px",
                     width: "180px",
+                    backgroundColor: "#4caf50",
                   }}
-                  onClick={() => handleCancel(booking.booking_id)}
+                  onClick={() => handleAcceptOffer(booking.booking_id)}
                   disabled={cancelLoadingId === booking.booking_id}
                 >
                   {cancelLoadingId === booking._id ? (
                     <CircularProgress size={20} sx={{ color: "white" }} />
                   ) : (
-                    "Cancel Booking"
+                    "Accept Offer"
                   )}
                 </Button>
                 <Button
@@ -258,13 +302,13 @@ export default function Offers() {
                     borderRadius: "10px",
                     width: "180px",
                   }}
-                  onClick={() => handleCancel(booking.booking_id)}
+                  onClick={() => handleRejectOffer(booking.booking_id)}
                   disabled={cancelLoadingId === booking.booking_id}
                 >
                   {cancelLoadingId === booking._id ? (
                     <CircularProgress size={20} sx={{ color: "white" }} />
                   ) : (
-                    "Cancel Booking"
+                    "Reject Offer"
                   )}
                 </Button>
               </Box>
