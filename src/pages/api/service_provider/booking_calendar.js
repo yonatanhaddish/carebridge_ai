@@ -1,9 +1,10 @@
+// pages/api/service_provider/booking_calendar.js
 import dbConnect from "../../../lib/mongoose";
 import ServiceProvider from "../../../models/ServiceProvider";
 import cookie from "cookie";
 import { verifyToken } from "../../../lib/jwt";
 
-// --- Get logged-in user from JWT cookie ---
+// Helpers
 function getUserFromRequest(req) {
   const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
   const token = cookies.token;
@@ -11,87 +12,24 @@ function getUserFromRequest(req) {
   return verifyToken(token);
 }
 
-// --- Helpers ---
-function toMinutes(t) {
-  const [h, m] = t.split(":").map(Number);
+function dateKey(d) {
+  return new Date(d).toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function toMinutes(time) {
+  const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
 }
 
-function timeOverlaps(slot1, slot2) {
-  return (
-    Math.max(toMinutes(slot1.start), toMinutes(slot2.start)) <
-    Math.min(toMinutes(slot1.end), toMinutes(slot2.end))
-  );
+function overlaps(a, b) {
+  const aStart = toMinutes(a.start);
+  const aEnd = toMinutes(a.end);
+  const bStart = toMinutes(b.start);
+  const bEnd = toMinutes(b.end);
+  return aStart < bEnd && bStart < aEnd;
 }
 
-// --- Normalize booking entries ---
-function normalizeBookingEntries(bookingData) {
-  const entries = Array.isArray(bookingData) ? bookingData : [bookingData];
-
-  return entries.map((entry) => ({
-    start_date: new Date(entry.start_date).toISOString(),
-    end_date: new Date(entry.end_date).toISOString(),
-    status: entry.status || "available",
-    booking_type: entry.booking_type || "availability",
-    recurring: Array.isArray(entry.recurring)
-      ? entry.recurring.map((daySchedule) => ({
-          day: daySchedule.day,
-          time_slots: Array.isArray(daySchedule.time_slots)
-            ? daySchedule.time_slots.map((slot) => ({
-                start: slot.start,
-                end: slot.end,
-              }))
-            : [],
-        }))
-      : [],
-  }));
-}
-
-// --- Conflict detection ---
-function detectBookingConflicts(newEntries, existingCalendar) {
-  const conflicts = [];
-
-  newEntries.forEach((newEntry) => {
-    const newStart = new Date(newEntry.start_date);
-    const newEnd = new Date(newEntry.end_date);
-
-    existingCalendar.forEach((existing) => {
-      const existStart = new Date(existing.start_date);
-      const existEnd = new Date(existing.end_date);
-
-      if (!(newEnd < existStart || newStart > existEnd)) {
-        if (
-          Array.isArray(newEntry.recurring) &&
-          Array.isArray(existing.recurring)
-        ) {
-          newEntry.recurring.forEach((newRec) => {
-            existing.recurring.forEach((existRec) => {
-              if (newRec.day === existRec.day) {
-                newRec.time_slots.forEach((newSlot) => {
-                  existRec.time_slots.forEach((existSlot) => {
-                    if (timeOverlaps(newSlot, existSlot)) {
-                      conflicts.push({
-                        type: "booking_conflict",
-                        message: `Conflict on ${newRec.day}`,
-                        requestedTime: `${newSlot.start}-${newSlot.end}`,
-                        existingTime: `${existSlot.start}-${existSlot.end}`,
-                        existingBookingType: existing.booking_type,
-                      });
-                    }
-                  });
-                });
-              }
-            });
-          });
-        }
-      }
-    });
-  });
-
-  return conflicts;
-}
-
-// --- API handler ---
+// Main handler
 export default async function handler(req, res) {
   await dbConnect();
 
@@ -101,51 +39,73 @@ export default async function handler(req, res) {
   const user = getUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Not authenticated" });
 
-  const { bookingData, action = "add" } = req.body;
-  if (!bookingData)
-    return res.status(400).json({ error: "Booking data required" });
+  const { action, bookingData } = req.body;
+  if (!bookingData || !Array.isArray(bookingData))
+    return res.status(400).json({ error: "bookingData array required" });
 
   try {
-    const normalizedEntries = normalizeBookingEntries(bookingData);
-    const provider = await ServiceProvider.findOne({ user_id: user.user_id });
-    if (!provider)
-      return res.status(404).json({ error: "ServiceProvider not found" });
+    const serviceProvider = await ServiceProvider.findOne({
+      user_id: user.user_id,
+    });
+    if (!serviceProvider)
+      return res.status(404).json({ error: "Service provider not found" });
 
-    if (action === "add") {
-      const conflicts = detectBookingConflicts(
-        normalizedEntries,
-        provider.availability_calendar
-      );
+    let addedDates = 0;
+    let addedSlots = 0;
+    const conflicts = [];
 
-      if (conflicts.length > 0) {
-        return res.status(200).json({
-          success: false,
-          message: "Booking conflicts detected",
-          conflicts,
-          added: [],
-          totalCalendarEntries: provider.availability_calendar.length,
+    bookingData.forEach((incoming) => {
+      incoming.recurring.forEach((rec) => {
+        const date = incoming.start_date;
+        const existing = serviceProvider.availability.find(
+          (a) => dateKey(a.date) === date
+        );
+
+        // No existing date → push all slots
+        if (!existing) {
+          serviceProvider.availability.push({
+            date: new Date(date),
+            time_slots: rec.time_slots,
+          });
+          addedDates++;
+          addedSlots += rec.time_slots.length;
+          return;
+        }
+
+        // Check each time slot for conflicts
+        rec.time_slots.forEach((slot) => {
+          const conflictWith = existing.time_slots.find((s) =>
+            overlaps(s, slot)
+          );
+
+          if (conflictWith) {
+            conflicts.push({
+              date,
+              requestedTime: `${slot.start} - ${slot.end}`,
+              existingTime: `${conflictWith.start} - ${conflictWith.end}`,
+              message: "Time slot conflict",
+            });
+          } else {
+            existing.time_slots.push(slot);
+            addedSlots++;
+          }
         });
-      }
-
-      const updated = await ServiceProvider.findOneAndUpdate(
-        { user_id: user.user_id },
-        { $push: { availability_calendar: { $each: normalizedEntries } } },
-        { new: true, runValidators: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: `Added ${normalizedEntries.length} slot(s) successfully!`,
-        added: normalizedEntries,
-        totalCalendarEntries: updated.availability_calendar.length,
       });
-    }
+    });
 
-    return res.status(400).json({ error: "Invalid action" });
+    await serviceProvider.save();
+
+    res.status(200).json({
+      success: true,
+      added: { dates: addedDates, slots: addedSlots },
+      conflicts,
+      availability: serviceProvider.availability,
+      message: conflicts.length
+        ? "Some slots could not be added due to conflicts"
+        : "All slots added successfully",
+    });
   } catch (err) {
-    console.error(err);
-    return res
-      .status(500)
-      .json({ error: "Server error", details: err.message });
+    console.error("Booking Calendar Error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 }
