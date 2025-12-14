@@ -1,40 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+<!-- {
+{
+  _id: ObjectId("66cfa1e9c9e4b23a9b91a111"),
 
-## Getting Started
+  service_provider_id: "7a4b3b4a-0f8d-4e22-9c7f-1b8c2c3c4d55",
 
-First, run the development server:
+  user_id: "2e91f1c1-5d77-4c10-9f64-cc3d14b5f222",
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+  first_name: "John",
+  last_name: "Doe",
+  email: "john.doe@example.com",
+  phone_number: "+1-647-555-0199",
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+  home_address: "123 King St W, Toronto, ON",
+  postal_code: "M5H2N2",
+  location_latitude: 43.65107,
+  location_longitude: -79.347015,
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+  service_levels_offered: ["Level 1", "Level 2"],
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+  service_prices: {
+    "Level 1": 35,
+    "Level 2": 50
+  },
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+  availability: [
+    // ─────────────────────────────────────
+    // Weekly recurring availability
+    {
+      recurrence: {
+        days: ["Monday", "Thursday"],
+        startDate: ISODate("2026-01-02T00:00:00.000Z"),
+        endDate: ISODate("2026-01-25T00:00:00.000Z")
+      },
+      times: [
+        { start: "10:00", end: "14:00" },
+        { start: "18:00", end: "22:00" }
+      ]
+    },
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+    // ─────────────────────────────────────
+    // Single specific day (startDate === endDate)
+    {
+      recurrence: {
+        days: ["Tuesday"],
+        startDate: ISODate("2026-02-10T00:00:00.000Z"),
+        endDate: ISODate("2026-02-10T00:00:00.000Z")
+      },
+      times: [
+        { start: "10:00", end: "22:00" }
+      ]
+    },
 
-## Learn More
+    // ─────────────────────────────────────
+    // Continuous date range (all days)
+    {
+      recurrence: {
+        days: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        startDate: ISODate("2026-03-10T00:00:00.000Z"),
+        endDate: ISODate("2026-03-14T00:00:00.000Z")
+      },
+      times: [
+        { start: "11:00", end: "16:00" }
+      ]
+    }
+  ],
 
-To learn more about Next.js, take a look at the following resources:
+  booking_confirmation_deadline_hours: 12,
+  required_advance_notice_hours: 24,
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+  profile_created_at: ISODate("2025-12-01T15:42:10.123Z"),
+  last_updated_at: ISODate("2025-12-11T18:20:45.456Z")
+}
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Key guarantees
+startDate === endDate → single day
+No weekday mentioned → use all 7 days
+Multiple time slots per rule supported
+Multiple rules per provider supported
+Any matching rule = available
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+
+🧠 Design contract (important)
+Availability is additive and opt-in only
+Providers only enter times they are willing to work
+No availability = not bookable
+No blocking logic needed
+No priority needed
+
+This keeps:
+schema simple
+AI parsing simple
+matching logic simple -->
+<!-- bugs minimal -->

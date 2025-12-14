@@ -2,45 +2,55 @@ import OpenAI from "openai";
 import { addDays, format, parseISO, isAfter } from "date-fns";
 
 // Map weekday names to numbers (0 = Sunday, 6 = Saturday)
-const WEEKDAY_MAP = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
+const ALL_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-/**
- * Expands availability JSON into concrete dates with time slots.
- * @param {Array} availabilityArray - parsed JSON from AI
- * @returns {Array} concrete availability objects [{ date: "YYYY-MM-DD", time_slots: [...] }]
- */
-function expandAvailability(availabilityArray) {
+function normalizeAndExpand(aiArray) {
   const concrete = [];
 
-  availabilityArray.forEach((entry) => {
-    const startDate = parseISO(entry.start_date);
-    const endDate = parseISO(entry.end_date);
+  aiArray.forEach((block) => {
+    const startDate = parseISO(block.start_date);
+    const endDate = parseISO(block.end_date);
 
-    // Generate all dates in the range
-    for (
-      let current = startDate;
-      !isAfter(current, endDate);
-      current = addDays(current, 1)
-    ) {
-      entry.recurring.forEach((rec) => {
-        if (WEEKDAY_MAP[rec.day] === current.getDay()) {
-          concrete.push({
-            date: format(current, "yyyy-MM-dd"),
-            time_slots: rec.time_slots.map((ts) => ({ ...ts })),
-          });
+    if (block.recurring && block.recurring.length > 0) {
+      block.recurring.forEach((rec) => {
+        const days = Array.isArray(rec.day)
+          ? rec.day.includes("ALL")
+            ? ALL_DAYS
+            : rec.day
+          : rec.day === "ALL"
+          ? ALL_DAYS
+          : [rec.day];
+
+        for (let d = startDate; !isAfter(d, endDate); d = addDays(d, 1)) {
+          const weekdayName = format(d, "EEEE");
+          if (days.includes(weekdayName)) {
+            concrete.push({
+              date: format(d, "yyyy-MM-dd"),
+              time_slots: rec.time_slots.map((ts) => ({
+                start: ts.start,
+                end: ts.end,
+              })),
+            });
+          }
         }
+      });
+    } else {
+      // Single-day fallback
+      concrete.push({
+        date: format(startDate, "yyyy-MM-dd"),
+        time_slots: [],
       });
     }
   });
@@ -59,67 +69,59 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Command required" });
   }
 
+  console.log("commandRecieved", command);
+
   try {
     const prompt = `
-Convert this natural language availability command into JSON suitable for a service provider's availability_calendar.
+Convert this natural language availability command into JSON.
+
 
 Command: "${command}"
 
-Instructions:
-- Only focus on schedule and availability; ignore names, participants, or purposes.
-- Support recurring patterns (e.g., "every Monday and Thursday") and single dates.
-- Include "start_date" and "end_date" in ISO format (YYYY-MM-DD).
-- For recurring days, output them as "recurring" entries with "day" and "time_slots".
-- Each "time_slot" must have "start" and "end" in 24-hour format "HH:MM".
-- If a day has multiple time blocks (e.g., "Monday 10am-2pm, 3pm-6pm"), include all under "time_slots".
-- Expand phrases like "every day", "weekdays", or "weekends" into the correct days.
-- For a single date (e.g., "on March 15, 2027 from 10am to 2pm"), set "start_date" and "end_date" to that date.
-- Only output valid JSON, no explanations.
 
-Return JSON in this exact format:
-[
-  {
-    "start_date": "YYYY-MM-DD",
-    "end_date": "YYYY-MM-DD",
-    "recurring": [
+Rules:
+    - Only output availability-related data.
+    - Support recurring weekdays and bounded date ranges.
+    - Use ISO date format (YYYY-MM-DD) for start_date and end_date.
+    - If no weekday restriction is specified for a date range (e.g., "March 10 to March 14"), output the day field as "ALL".
+    - Multiple time blocks per day are allowed.
+    - For a single-day availability, start_date and end_date must be identical.
+    - Use 24-hour time format HH:MM.
+    - IMPORTANT: Return ONLY valid JSON that strictly adheres to the schema below.
+
+    JSON Schema:
+    [
       {
-        "day": "Monday",
-        "time_slots": [
-          { "start": "HH:MM", "end": "HH:MM" },
-          { "start": "HH:MM", "end": "HH:MM" }
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD",
+        "recurring": [
+          {
+            "day": "Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday | ALL",
+            "time_slots": [
+              { "start": "HH:MM", "end": "HH:MM" }
+            ]
+          }
         ]
       }
     ]
-  }
-]
-Only output valid JSON, no explanations.
-`;
+    
+    Start JSON Output now (do not include markdown ticks or explanations):
+  `;
 
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // or "gpt-4o" or "gpt-4.1"
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
     });
 
     const text = response.choices[0].message.content.trim();
+    const parsed = JSON.parse(text);
+    const concreteAvailability = normalizeAndExpand(parsed);
 
-    // Parse AI JSON safely
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (jsonErr) {
-      console.error("JSON Parse Error:", jsonErr);
-      return res.status(500).json({
-        error: "AI returned invalid JSON",
-        details: jsonErr.message,
-        raw: text,
-      });
-    }
+    console.log("concreteAvailability", concreteAvailability);
+    console.log("concreteAvailability", concreteAvailability[0].time_slots);
 
-    // Expand recurring patterns into concrete dates
-    const concreteAvailability = expandAvailability(parsed);
-
-    res.json({ success: true, parsed, concreteAvailability });
+    res.json({ success: true, concreteAvailability });
   } catch (err) {
     console.error("AI Error:", err);
     res.status(500).json({
