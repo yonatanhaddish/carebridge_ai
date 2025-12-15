@@ -118,9 +118,6 @@ Rules:
     const parsed = JSON.parse(text);
     const concreteAvailability = normalizeAndExpand(parsed);
 
-    console.log("concreteAvailability", concreteAvailability);
-    console.log("concreteAvailability", concreteAvailability[0].time_slots);
-
     res.json({ success: true, concreteAvailability });
   } catch (err) {
     console.error("AI Error:", err);

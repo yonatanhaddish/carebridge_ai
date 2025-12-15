@@ -1,3 +1,4 @@
+// pages/api/ai/parseServiceSeekerCommand.js
 import OpenAI from "openai";
 import { parseISO, addDays, isAfter, format } from "date-fns";
 
@@ -15,17 +16,16 @@ const WEEKDAY_MAP = {
 };
 
 // --- Expand recurring into concrete dates ---
-function expandAvailability(availabilityArray) {
+function expandRequests(requestArray) {
   const concrete = [];
-  if (!Array.isArray(availabilityArray)) return concrete;
+  if (!Array.isArray(requestArray)) return concrete;
 
-  availabilityArray.forEach((entry) => {
+  requestArray.forEach((entry) => {
     if (!entry || !entry.start_date || !entry.end_date) return;
-
     const startDate = parseISO(entry.start_date);
     const endDate = parseISO(entry.end_date);
 
-    // Handle one-time time slots (for specific date ranges)
+    // One-time or date-range time_slots
     if (Array.isArray(entry.time_slots) && entry.time_slots.length > 0) {
       for (
         let current = startDate;
@@ -38,11 +38,12 @@ function expandAvailability(availabilityArray) {
             start: ts.start,
             end: ts.end,
           })),
+          service_level: entry.service_level || null,
         });
       }
     }
 
-    // Handle recurring days
+    // Recurring days
     if (Array.isArray(entry.recurring) && entry.recurring.length > 0) {
       for (
         let current = startDate;
@@ -50,8 +51,7 @@ function expandAvailability(availabilityArray) {
         current = addDays(current, 1)
       ) {
         entry.recurring.forEach((rec) => {
-          if (!rec || !rec.day || !Array.isArray(rec.time_slots)) return;
-
+          if (!rec?.day || !Array.isArray(rec.time_slots)) return;
           if (WEEKDAY_MAP[rec.day] === current.getDay()) {
             concrete.push({
               date: format(current, "yyyy-MM-dd"),
@@ -59,10 +59,53 @@ function expandAvailability(availabilityArray) {
                 start: ts.start,
                 end: ts.end,
               })),
+              service_level: entry.service_level || null,
             });
           }
         });
       }
+    }
+  });
+
+  return concrete;
+}
+
+function normalizeAndExpand(aiArray) {
+  const concrete = [];
+
+  aiArray.forEach((block) => {
+    const startDate = parseISO(block.start_date);
+    const endDate = parseISO(block.end_date);
+
+    if (block.recurring && block.recurring.length > 0) {
+      block.recurring.forEach((rec) => {
+        const days = Array.isArray(rec.day)
+          ? rec.day.includes("ALL")
+            ? ALL_DAYS
+            : rec.day
+          : rec.day === "ALL"
+          ? ALL_DAYS
+          : [rec.day];
+
+        for (let d = startDate; !isAfter(d, endDate); d = addDays(d, 1)) {
+          const weekdayName = format(d, "EEEE");
+          if (days.includes(weekdayName)) {
+            concrete.push({
+              date: format(d, "yyyy-MM-dd"),
+              time_slots: rec.time_slots.map((ts) => ({
+                start: ts.start,
+                end: ts.end,
+              })),
+            });
+          }
+        }
+      });
+    } else {
+      // Single-day fallback
+      concrete.push({
+        date: format(startDate, "yyyy-MM-dd"),
+        time_slots: [],
+      });
     }
   });
 
@@ -75,170 +118,71 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
 
   const { command } = req.body;
-  if (!command) return res.status(400).json({ error: "Command required" });
+  if (!command) return res.status(400).json({ error: "Command is required" });
 
   try {
     const prompt = `
-You are a booking assistant AI that converts natural language into structured availability schedules.
+You are a booking assistant AI. Convert natural language availability commands into structured JSON for service seeker requests.
 
-**Command to parse:** "${command}"
+Command: "${command}"
 
-**Convert the command into a JSON array where EACH ITEM uses this EXACT structure:**
+**Requirements:**
+- Return ONLY valid JSON array. No markdown, no explanations.
+- Each item must include:
+  - start_date (YYYY-MM-DD)
+  - end_date (YYYY-MM-DD)
+  - time_slots: array of { start: HH:MM, end: HH:MM }
+  - service_level: one of "Level 1", "Level 2", "Level 3" (extract from command)
 
-For RECURRING schedules (e.g., "every Monday and Thursday from Jan 2 to Jan 25"):
-{
-  "start_date": "YYYY-MM-DD",
-  "end_date": "YYYY-MM-DD",
-  "time_slots": [],
-  "recurring": [
-    {
-      "day": "Monday",
-      "time_slots": [
-        { "start": "HH:MM", "end": "HH:MM" }
-      ]
-    },
-    {
-      "day": "Thursday", 
-      "time_slots": [
-        { "start": "HH:MM", "end": "HH:MM" }
-      ]
-    }
-  ]
-}
+**Rules:**
+- Single date → start_date = end_date
+- Date range → start_date = first date, end_date = last date
+- Recurring weekdays → put in recurring[], leave time_slots empty
+- Always include BOTH time_slots and recurring even if empty
+- Convert all times to 24-hour format
+- Extract service_level automatically from the command
+- IMPORTANT: Extract the service_level from the command and include it in every object. 
+- It must be "Level 1", "Level 2", or "Level 3".
+- IMPORTANT: Return ONLY valid JSON that strictly adheres to the schema below.
 
-For ONE-TIME schedules (e.g., "Feb 10 from 10am to 10pm"):
-{
-  "start_date": "YYYY-MM-DD",
-  "end_date": "YYYY-MM-DD",
-  "time_slots": [
-    { "start": "HH:MM", "end": "HH:MM" }
-  ],
-  "recurring": []
-}
 
-For DATE RANGE schedules (e.g., "March 10 to March 14 from 9am-5pm"):
-{
-  "start_date": "YYYY-MM-DD",
-  "end_date": "YYYY-MM-DD", 
-  "time_slots": [
-    { "start": "HH:MM", "end": "HH:MM" }
-  ],
-  "recurring": []
-}
-
-**IMPORTANT RULES:**
-1. For SINGLE DATE (like "Feb 10"): start_date = end_date = that date
-2. For DATE RANGE (like "Jan 2 to Jan 25"): start_date = first date, end_date = last date
-3. For RECURRING (mentions weekdays like "every Monday"): put days in recurring[], keep time_slots empty
-4. NEVER put weekdays in recurring[] for a single date or date range without explicit recurring mention
-5. Convert all times to 24-hour format (e.g., "10:00" for 10am, "22:00" for 10pm)
-6. Always include BOTH time_slots (array) and recurring (array) even if empty
-7. Today's date is ${format(new Date(), "MMMM d, yyyy")}
-
-**Examples:**
-Command: "Set my availability every Monday and Thursday from January 2 to January 25, 2026 10am-2pm"
-Output: [
-  {
-    "start_date": "2026-01-02",
-    "end_date": "2026-01-25",
-    "time_slots": [],
-    "recurring": [
+JSON Schema:
+    [
       {
-        "day": "Monday",
-        "time_slots": [{ "start": "10:00", "end": "14:00" }]
-      },
-      {
-        "day": "Thursday",
-        "time_slots": [{ "start": "10:00", "end": "14:00" }]
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD",
+        "recurring": [
+          {
+            "day": "Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday | ALL",
+            "time_slots": [
+              { "start": "HH:MM", "end": "HH:MM" }
+            ]
+          }
+        ],
+        service_level: "Level 1"
       }
     ]
-  }
-]
-
-Command: "Set availability for 10th February, 2026 from 10am to 10pm"
-Output: [
-  {
-    "start_date": "2026-02-10",
-    "end_date": "2026-02-10",
-    "time_slots": [{ "start": "10:00", "end": "22:00" }],
-    "recurring": []
-  }
-]
-
-Command: "Set availability March 10 to March 14, 2026 from 9am to 5pm"
-Output: [
-  {
-    "start_date": "2026-03-10",
-    "end_date": "2026-03-14",
-    "time_slots": [{ "start": "09:00", "end": "17:00" }],
-    "recurring": []
-  }
-]
-
-**Now parse this command:** "${command}"
-
-Return ONLY valid JSON array. No explanations.
-`;
-
+    
+    Start JSON Output now (do not include markdown ticks or explanations):
+  `;
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
-      max_tokens: 1500,
     });
 
     const text = response.choices[0].message.content.trim();
-    console.log("AI Raw Response:", text);
+    const parsed = JSON.parse(text);
 
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (err) {
-      console.error("JSON Parse Error:", err.message);
-      console.error("Raw AI Response:", text);
-      return res
-        .status(500)
-        .json({ error: "AI returned invalid JSON", raw: text });
-    }
+    const concreteAvailability = normalizeAndExpand(parsed);
 
-    // Validate parsed data
-    if (!Array.isArray(parsed)) {
-      return res.status(400).json({
-        error: "AI should return an array",
-        parsed,
-      });
-    }
+    console.log("parsed", parsed);
 
-    // Validate each entry
-    const validated = parsed.map((entry, index) => {
-      if (!entry.start_date || !entry.end_date) {
-        throw new Error(`Entry ${index} missing start_date or end_date`);
-      }
+    console.log("concreteAvailability", concreteAvailability);
 
-      // Ensure time_slots and recurring are arrays
-      return {
-        start_date: entry.start_date,
-        end_date: entry.end_date,
-        time_slots: Array.isArray(entry.time_slots) ? entry.time_slots : [],
-        recurring: Array.isArray(entry.recurring) ? entry.recurring : [],
-      };
-    });
-
-    const concreteAvailability = expandAvailability(validated);
-
-    console.log("Parsed Data:", JSON.stringify(validated, null, 2));
-    console.log("Concrete Dates:", concreteAvailability.length);
-
-    res.status(200).json({
-      success: true,
-      parsed: validated,
-      concreteAvailability,
-    });
+    res.json({ success: true, parsed, concreteAvailability });
   } catch (err) {
     console.error("AI Parsing Error:", err);
-    res.status(500).json({
-      error: "AI parsing failed",
-      details: err.message,
-    });
+    res.status(500).json({ error: "AI parsing failed", details: err.message });
   }
 }
