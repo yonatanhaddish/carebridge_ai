@@ -119,7 +119,7 @@ export default async function handler(req, res) {
         .json({ error: "AI returned empty or invalid availability" });
     }
 
-    const results = [];
+    const bookingsToCreate = [];
 
     // Each entry = one service request (may contain multiple recurring days)
     for (const entry of aiParsed) {
@@ -143,19 +143,44 @@ export default async function handler(req, res) {
         )
         .sort((a, b) => a.distance - b.distance);
 
-      results.push({
+      if (!eligibleProviders.length) continue;
+
+      const matchedprovider = eligibleProviders[0].provider;
+
+      console.log("matchedProvider", matchedprovider);
+
+      bookingsToCreate.push({
+        service_seeker_id: seeker.service_seeker_id,
+        service_provider_id: matchedprovider.service_provider_id,
         service_level: entry.service_level,
-        requested_book: entry,
-        providers: eligibleProviders.map((p) => p.provider),
-        seeker: seeker,
+        daily_bookings: [
+          {
+            date: entry.date,
+            time_slots: entry.time_slots,
+          },
+        ],
+        status: "Pending",
+        request_created_at: new Date(),
+        confirmation_deadline: new Date(Date.now() + 12 * 60 * 60 * 1000),
+        location_address: seeker.location_address,
+        location_postal_code: seeker.location_postal_code,
+        location_latitude: seeker.location_latitude,
+        location_longitude: seeker.location_longitude,
+        notes: "",
       });
     }
 
-    console.log("results", results);
-    // console.log("service seeker", seeker);
-    console.log("providers", results[0]);
+    if (!bookingsToCreate.length) {
+      return res.status(400).json({
+        error: "No providers available for requested times",
+      });
+    }
 
-    return res.status(200).json({ success: true, results });
+    // console.log("results", results);
+    // console.log("service seeker", seeker);
+    console.log("booking", bookingsToCreate);
+
+    return res.status(200).json({ success: true });
   } catch (err) {
     console.error("Booking creation error:", err);
     return res.status(500).json({
