@@ -4,71 +4,16 @@ import { parseISO, addDays, isAfter, format } from "date-fns";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Map weekday names to numbers (0 = Sunday)
-const WEEKDAY_MAP = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
-
-// --- Expand recurring into concrete dates ---
-function expandRequests(requestArray) {
-  const concrete = [];
-  if (!Array.isArray(requestArray)) return concrete;
-
-  requestArray.forEach((entry) => {
-    if (!entry || !entry.start_date || !entry.end_date) return;
-    const startDate = parseISO(entry.start_date);
-    const endDate = parseISO(entry.end_date);
-
-    // One-time or date-range time_slots
-    if (Array.isArray(entry.time_slots) && entry.time_slots.length > 0) {
-      for (
-        let current = startDate;
-        !isAfter(current, endDate);
-        current = addDays(current, 1)
-      ) {
-        concrete.push({
-          date: format(current, "yyyy-MM-dd"),
-          time_slots: entry.time_slots.map((ts) => ({
-            start: ts.start,
-            end: ts.end,
-          })),
-          service_level: entry.service_level || null,
-        });
-      }
-    }
-
-    // Recurring days
-    if (Array.isArray(entry.recurring) && entry.recurring.length > 0) {
-      for (
-        let current = startDate;
-        !isAfter(current, endDate);
-        current = addDays(current, 1)
-      ) {
-        entry.recurring.forEach((rec) => {
-          if (!rec?.day || !Array.isArray(rec.time_slots)) return;
-          if (WEEKDAY_MAP[rec.day] === current.getDay()) {
-            concrete.push({
-              date: format(current, "yyyy-MM-dd"),
-              time_slots: rec.time_slots.map((ts) => ({
-                start: ts.start,
-                end: ts.end,
-              })),
-              service_level: entry.service_level || null,
-            });
-          }
-        });
-      }
-    }
-  });
-
-  return concrete;
-}
+// Map weekday names to numbers (0 = Sunday, 6 = Saturday)
+const ALL_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 function normalizeAndExpand(aiArray) {
   const concrete = [];
@@ -96,6 +41,7 @@ function normalizeAndExpand(aiArray) {
                 start: ts.start,
                 end: ts.end,
               })),
+              service_level: block.service_level,
             });
           }
         }
@@ -105,6 +51,7 @@ function normalizeAndExpand(aiArray) {
       concrete.push({
         date: format(startDate, "yyyy-MM-dd"),
         time_slots: [],
+        service_level: block.service_level,
       });
     }
   });
@@ -122,33 +69,24 @@ export default async function handler(req, res) {
 
   try {
     const prompt = `
-You are a booking assistant AI. Convert natural language availability commands into structured JSON for service seeker requests.
-
+Convert this natural language availability command into JSON.
 Command: "${command}"
 
-**Requirements:**
-- Return ONLY valid JSON array. No markdown, no explanations.
-- Each item must include:
-  - start_date (YYYY-MM-DD)
-  - end_date (YYYY-MM-DD)
-  - time_slots: array of { start: HH:MM, end: HH:MM }
-  - service_level: one of "Level 1", "Level 2", "Level 3" (extract from command)
+Rules:
+    - Only output availability-related data.
+    - Support recurring weekdays and bounded date ranges.
+    - Use ISO date format (YYYY-MM-DD) for start_date and end_date.
+    - If no weekday restriction is specified for a date range (e.g., "March 10 to March 14"), output the day field as "ALL".
+    - Multiple time blocks per day are allowed.
+    - For a single-day availability, start_date and end_date must be identical.
+    - Use 24-hour time format HH:MM.
+    - service_level: One of Level 1, Level 2, Level 3
+    - IMPORTANT: Return ONLY valid JSON that strictly adheres to the schema below.
 
-**Rules:**
-- Single date → start_date = end_date
-- Date range → start_date = first date, end_date = last date
-- Recurring weekdays → put in recurring[], leave time_slots empty
-- Always include BOTH time_slots and recurring even if empty
-- Convert all times to 24-hour format
-- Extract service_level automatically from the command
-- IMPORTANT: Extract the service_level from the command and include it in every object. 
-- It must be "Level 1", "Level 2", or "Level 3".
-- IMPORTANT: Return ONLY valid JSON that strictly adheres to the schema below.
-
-
-JSON Schema:
+    JSON Schema:
     [
       {
+        "service_level": Level 1
         "start_date": "YYYY-MM-DD",
         "end_date": "YYYY-MM-DD",
         "recurring": [
@@ -158,8 +96,7 @@ JSON Schema:
               { "start": "HH:MM", "end": "HH:MM" }
             ]
           }
-        ],
-        service_level: "Level 1"
+        ]
       }
     ]
     
@@ -176,9 +113,14 @@ JSON Schema:
 
     const concreteAvailability = normalizeAndExpand(parsed);
 
-    console.log("parsed", parsed);
+    // console.log("parsed", parsed);
 
-    console.log("concreteAvailability", concreteAvailability);
+    // console.log("concreteAvailability", concreteAvailability);
+
+    // console.log(
+    //   "concreteAvailability_timeslot",
+    //   concreteAvailability[0].time_slots
+    // );
 
     res.json({ success: true, parsed, concreteAvailability });
   } catch (err) {
