@@ -27,9 +27,13 @@ export default async function handler(req, res) {
       if (!booking) return res.status(404).json({ error: "Booking not found" });
 
       booking.status = "Cancelled";
+      booking.cancelled_at = new Date();
+
       await booking.save();
 
-      res.status(200).json({ success: true, message: "Booking cancelled" });
+      res
+        .status(200)
+        .json({ success: true, message: "Booking cancelled successfully" });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

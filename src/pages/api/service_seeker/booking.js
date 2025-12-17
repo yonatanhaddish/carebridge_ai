@@ -40,7 +40,7 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// --- Availability checker (MATCH ALL REQUESTS) ---
+// --- Availability checker (FULL DAY + TIME COVERAGE) ---
 function checkProviderAvailability(provider, requestedDays) {
   if (!Array.isArray(provider.availability)) return false;
   if (!Array.isArray(requestedDays)) return false;
@@ -51,9 +51,7 @@ function checkProviderAvailability(provider, requestedDays) {
   };
 
   const normalizeDate = (value) => {
-    if (!value) return null;
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-
     const d = new Date(value);
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(
       2,
@@ -68,9 +66,7 @@ function checkProviderAvailability(provider, requestedDays) {
       (a) => normalizeDate(a.date) === reqDate
     );
 
-    if (!providerDay || !Array.isArray(providerDay.time_slots)) {
-      return false;
-    }
+    if (!providerDay || !Array.isArray(providerDay.time_slots)) return false;
 
     return req.time_slots.every((reqSlot) => {
       const rs = toMinutes(reqSlot.start);
@@ -110,60 +106,79 @@ export default async function handler(req, res) {
   }
 
   try {
-    // --- Parse natural language command via AI (expanded recurrence)
+    // 1️⃣ Parse AI (already expanded recurrence)
     const aiParsed = await parseAI(command);
 
     if (!Array.isArray(aiParsed) || aiParsed.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "AI returned empty or invalid availability" });
+      return res.status(400).json({
+        error: "AI returned empty or invalid availability",
+      });
     }
 
     const bookingsToCreate = [];
 
-    // Each entry = one service request (may contain multiple recurring days)
+    // 2️⃣ Process each concrete request
     for (const entry of aiParsed) {
       const providers = await ServiceProvider.find({
         service_levels_offered: entry.service_level,
       }).lean();
-      const eligibleProviders = providers
-        .filter(Boolean) // prevents undefined
-        .map((p) => ({
-          provider: p,
-          distance: distanceKm(
-            seeker.location_latitude,
-            seeker.location_longitude,
-            p.location_latitude,
-            p.location_longitude
-          ),
-        }))
-        .filter((p) => p.distance <= 30)
-        .filter(
-          (p) => p.provider && checkProviderAvailability(p.provider, [entry])
-        )
-        .sort((a, b) => a.distance - b.distance);
+
+      const eligibleProviders = [];
+
+      for (const provider of providers) {
+        // Distance filter
+        const distance = distanceKm(
+          seeker.location_latitude,
+          seeker.location_longitude,
+          provider.location_latitude,
+          provider.location_longitude
+        );
+
+        if (distance > 30) continue;
+
+        // Availability check
+        if (!checkProviderAvailability(provider, [entry])) continue;
+
+        // ❌ Double booking check (date-level lock)
+        const conflict = await Booking.findOne({
+          service_provider_id: provider.service_provider_id,
+          "daily_bookings.date": new Date(entry.date),
+          status: { $in: ["Pending", "Confirmed"] },
+        });
+
+        if (conflict) continue;
+
+        eligibleProviders.push({ provider, distance });
+      }
 
       if (!eligibleProviders.length) continue;
 
-      const matchedprovider = eligibleProviders[0].provider;
+      // 3️⃣ Pick closest provider
+      eligibleProviders.sort((a, b) => a.distance - b.distance);
+      const matchedProvider = eligibleProviders[0].provider;
 
-      console.log("matchedProvider", matchedprovider);
-
+      // 4️⃣ Create booking payload
       bookingsToCreate.push({
         service_seeker_id: seeker.service_seeker_id,
-        service_provider_id: matchedprovider.service_provider_id,
+        service_provider_id: matchedProvider.service_provider_id,
         service_level: entry.service_level,
+        price: matchedProvider.service_prices?.[entry.service_level] ?? 0,
+
         daily_bookings: [
           {
-            date: entry.date,
+            date: new Date(entry.date),
             time_slots: entry.time_slots,
           },
         ],
+
         status: "Pending",
         request_created_at: new Date(),
         confirmation_deadline: new Date(Date.now() + 12 * 60 * 60 * 1000),
-        location_address: seeker.location_address,
-        location_postal_code: seeker.location_postal_code,
+        confirmed_at: null,
+        cancelled_at: null,
+
+        location_address: seeker.home_address,
+        location_postal_code: seeker.postal_code,
         location_latitude: seeker.location_latitude,
         location_longitude: seeker.location_longitude,
         notes: "",
@@ -172,15 +187,17 @@ export default async function handler(req, res) {
 
     if (!bookingsToCreate.length) {
       return res.status(400).json({
-        error: "No providers available for requested times",
+        error: "No providers available for requested dates/times",
       });
     }
 
-    // console.log("results", results);
-    // console.log("service seeker", seeker);
-    console.log("booking", bookingsToCreate);
+    // 5️⃣ Save bookings
+    const savedBookings = await Booking.insertMany(bookingsToCreate);
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({
+      success: true,
+      bookings: savedBookings,
+    });
   } catch (err) {
     console.error("Booking creation error:", err);
     return res.status(500).json({

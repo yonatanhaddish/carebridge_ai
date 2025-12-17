@@ -89,29 +89,14 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
       setCancelLoadingId(null);
     }
   };
+
+  const formatUTCDateOnly = (date) => {
+    return new Date(date).toLocaleDateString("en-CA", {
+      timeZone: "UTC",
+    });
+  };
+
   console.log("333", bookings);
-
-  const statusColor = (status) => {
-    const value = status?.toLowerCase();
-    if (value === "pending") return "warning";
-    if (value === "confirmed" || value === "approved") return "success";
-    if (value === "Cancelled" || value === "cancelled") return "error";
-    return "default";
-  };
-
-  const renderRecurringSchedule = (recurring) => {
-    if (!recurring?.length) return "No recurring schedule.";
-    return (
-      <Box component="ul" sx={{ ml: 2, mt: 0 }}>
-        {recurring.map((r, i) => (
-          <Typography key={i} component="li" variant="body2">
-            <b>{r.day}:</b>{" "}
-            {r.time_slots.map((s) => `${s.start}–${s.end}`).join(", ")}
-          </Typography>
-        ))}
-      </Box>
-    );
-  };
 
   return (
     <Box sx={{ p: 4, maxWidth: 900, margin: "auto" }}>
@@ -179,44 +164,26 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                 </Typography>
               </Box>
 
-              {/* Dates */}
+              {/* Schedule */}
               <Box sx={{ mb: 2 }}>
                 <Typography sx={{ fontWeight: "600", mb: 0.5 }}>
-                  Dates
+                  Schedule
                 </Typography>
-                <Typography sx={{ color: "#555" }}>
-                  {formatUTCtoLocalCalendarDate(
-                    booking.start_datetime,
-                    "dd MMMM yyyy"
-                  )}{" "}
-                  →{" "}
-                  {formatUTCtoLocalCalendarDate(
-                    booking.end_datetime,
-                    "dd MMMM yyyy"
-                  )}
-                </Typography>
-                <Typography sx={{ color: "#555" }}>
-                  {formatUTCtoLocalCalendarDate(
-                    booking.start_datetime,
-                    "HH:mm"
-                  )}{" "}
-                  →{" "}
-                  {formatUTCtoLocalCalendarDate(booking.end_datetime, "HH:mm")}
-                </Typography>
-              </Box>
 
-              {/* Recurring */}
-              <Box sx={{ mb: 2 }}>
-                <Box
-                  sx={{
-                    pl: 1,
-                    color: "#555",
-                    fontSize: "0.95rem",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {renderRecurringSchedule(booking.recurring)}
-                </Box>
+                {Array.isArray(booking.daily_bookings) &&
+                  booking.daily_bookings.map((day, idx) => (
+                    <Box key={idx} sx={{ ml: 1, mb: 1 }}>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {formatUTCDateOnly(day.date)}
+                      </Typography>
+
+                      <Typography sx={{ color: "#555" }}>
+                        {day.time_slots
+                          .map((slot) => `${slot.start} – ${slot.end}`)
+                          .join(", ")}
+                      </Typography>
+                    </Box>
+                  ))}
               </Box>
 
               {/* Provider & Status */}
@@ -224,7 +191,7 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                 <Typography sx={{ fontWeight: "600" }}>
                   Provider:
                   <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {booking.provider?.name || "Unassigned / Pending"}
+                    {booking.provider?.name || "Unassigned"}
                   </span>
                 </Typography>
 
