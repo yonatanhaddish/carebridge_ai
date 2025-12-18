@@ -1,52 +1,40 @@
-import React, { use, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
   Paper,
   CircularProgress,
-  Chip,
   Button,
 } from "@mui/material";
 import axios from "axios";
 
-// Proper date formatting
-import { format, parseISO } from "date-fns";
+/* ================= UTIL ================= */
 
-/**
- * Convert UTC ISO string to local formatted string
- * @param {string|Date} utcDateStr - UTC ISO string
- * @param {string} fmt - optional date-fns format string
- */
-export function formatUTCtoLocalCalendarDate(
-  utcDateStr,
-  fmt = "yyyy-MM-dd HH:mm"
-) {
-  if (!utcDateStr) return "";
-  const date =
-    typeof utcDateStr === "string" ? parseISO(utcDateStr) : utcDateStr;
-  return format(date, fmt); // uses local timezone automatically
-}
+const formatUTCDateOnly = (date) =>
+  new Date(date).toLocaleDateString("en-CA", { timeZone: "UTC" });
+
+/* ================= COMPONENT ================= */
 
 export default function Offers() {
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
-  const [cancelLoadingId, setCancelLoadingId] = useState(null);
-  const [seeker, setSeeker] = useState({});
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [seekers, setSeekers] = useState({});
+
+  /* ================= FETCH BOOKINGS ================= */
 
   const fetchBookings = async () => {
     setLoading(true);
+    setError(null);
+
     try {
-      const response = await axios.get(
+      const { data } = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/pending`
       );
-      setBookings(response.data.bookings || []);
+      setBookings(data.bookings || []);
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Unable to load bookings."
-      );
+      setError(err.response?.data?.error || "Unable to load bookings.");
     } finally {
       setLoading(false);
     }
@@ -56,269 +44,213 @@ export default function Offers() {
     fetchBookings();
   }, []);
 
+  /* ================= FETCH SEEKERS (BATCHED) ================= */
+
   useEffect(() => {
-    if (bookings.length > 0) {
-      bookings.forEach(async (booking) => {
-        try {
-          const response = await axios.get(
-            `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/${booking.service_seeker_id}`
-          );
-          setSeeker((prev) => ({
-            ...prev,
-            [booking.service_seeker_id]: response.data.seeker,
-          }));
-        } catch (err) {
-          console.error("Failed to fetch seeker data:", err);
-        }
-      });
-    }
+    if (!bookings.length) return;
+
+    const fetchSeekers = async () => {
+      const uniqueIds = [...new Set(bookings.map((b) => b.service_seeker_id))];
+
+      try {
+        const responses = await Promise.all(
+          uniqueIds.map((id) =>
+            axios.get(
+              `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/${id}`
+            )
+          )
+        );
+
+        const seekerMap = {};
+        responses.forEach((res) => {
+          seekerMap[res.data.seeker.service_seeker_id] = res.data.seeker;
+        });
+
+        setSeekers(seekerMap);
+      } catch (err) {
+        console.error("Failed to fetch seekers", err);
+      }
+    };
+
+    fetchSeekers();
   }, [bookings]);
-  // console.log("555", seeker);
 
-  const handleRejectOffer = async (bookingId) => {
-    if (!confirm("Are you sure you want to cancel this booking?")) return;
-    // console.log("111", bookingId);
+  /* ================= ACTIONS ================= */
 
-    setCancelLoadingId(bookingId);
+  const handleAccept = async (bookingId) => {
+    if (!confirm("Accept this booking?")) return;
 
-    console.log("bookingId", bookingId);
-    console.log("cancelLoadingId", cancelLoadingId);
-
-    try {
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/reject/${bookingId}`
-      );
-      fetchBookings();
-    } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to reject offer."
-      );
-    }
-  };
-  const handleAcceptOffer = async (bookingId) => {
-    if (!confirm("Are you sure you want to accept this booking?")) return;
-    // console.log("111", bookingId);
-    setCancelLoadingId(bookingId);
-    console.log("bookingId", bookingId);
-    console.log("cancelLoadingId", cancelLoadingId);
+    setActionLoadingId(bookingId);
     try {
       await axios.post(
         `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/accept/${bookingId}`
       );
       fetchBookings();
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to accept offer."
-      );
+      alert(err.response?.data?.error || "Failed to accept booking");
     } finally {
-      setCancelLoadingId(null);
+      setActionLoadingId(null);
     }
   };
 
-  const statusColor = (status) => {
-    const value = status?.toLowerCase();
-    if (value === "pending") return "warning";
-    if (value === "confirmed" || value === "approved") return "success";
-    if (value === "Cancelled" || value === "cancelled") return "error";
-    return "default";
+  const handleReject = async (bookingId) => {
+    if (!confirm("Reject this booking?")) return;
+
+    setActionLoadingId(bookingId);
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/bookings/reject/${bookingId}`
+      );
+      fetchBookings();
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to reject booking");
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
-  const renderRecurringSchedule = (recurring) => {
-    if (!recurring?.length) return "No recurring schedule.";
-    return (
-      <Box component="ul" sx={{ ml: 2, mt: 0 }}>
-        {recurring.map((r, i) => (
-          <Typography key={i} component="li" variant="body2">
-            <b>{r.day}:</b>{" "}
-            {r.time_slots.map((s) => `${s.start}–${s.end}`).join(", ")}
-          </Typography>
-        ))}
-      </Box>
-    );
-  };
+  /* ================= UI ================= */
 
   return (
-    <Box sx={{ p: 4, maxWidth: 900, margin: "auto" }}>
-      <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
+    <Box
+      sx={{
+        p: 4,
+        maxWidth: 900,
+        mx: "auto",
+        width: {
+          xs: "100%", // mobile
+          sm: "80%", // tablet
+          md: "60%", // desktop
+        },
+      }}
+    >
+      <Typography variant="h4" fontWeight="bold">
         My Offers
       </Typography>
 
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        View, manage, and cancel your offers.
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Review and manage incoming booking offers
       </Typography>
 
       {loading && (
         <Box sx={{ textAlign: "center", mt: 4 }}>
-          <CircularProgress size={40} />
+          <CircularProgress />
         </Box>
       )}
 
       {error && (
-        <Paper sx={{ p: 2, bgcolor: "error.light", color: "white", mt: 3 }}>
-          <Typography variant="h6">Error</Typography>
-          <Typography>{error}</Typography>
+        <Paper sx={{ p: 2, mt: 3, bgcolor: "error.light", color: "#fff" }}>
+          {error}
         </Paper>
       )}
 
-      {!loading && bookings.length > 0
-        ? bookings.map((booking) => (
+      {!loading && bookings.length === 0 && (
+        <Paper sx={{ p: 3, mt: 3, textAlign: "center" }}>
+          No pending offers found.
+        </Paper>
+      )}
+
+      {bookings.map((booking) => {
+        const seeker = seekers[booking.service_seeker_id];
+
+        return (
+          <Box
+            key={booking.booking_id}
+            sx={{
+              p: 3,
+              mb: 3,
+              borderRadius: "14px",
+              backgroundColor: "#EFEFFB",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              border: "solid #020e20 1px",
+            }}
+          >
+            {/* HEADER */}
             <Box
-              key={booking._id}
               sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: "12px",
-                p: 3,
-                mb: 3,
-                backgroundColor: "#EFEFFB",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-                width: { sm: "100%", md: "70%" },
-                mx: "auto",
+                display: "flex",
+                justifyContent: "space-between",
+                mb: 2,
+                borderBottom: "1px solid #020e20",
+                pb: 1,
               }}
             >
-              {/* Header */}
-              <Box
-                sx={{
-                  borderBottom: "1px solid #e0e0e0",
-                  pb: 2,
-                  mb: 2,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography sx={{ fontWeight: "700", fontSize: "1.25rem" }}>
-                  {booking.service_level}
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontWeight: "700",
-                    fontSize: "1.25rem",
-                    color: "#1976d2",
-                  }}
-                >
-                  {booking.price} CAD / hr
-                </Typography>
-              </Box>
-
-              {/* Dates */}
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={{ fontWeight: "600", mb: 0.5 }}>
-                  Dates
-                </Typography>
-                <Typography sx={{ color: "#555" }}>
-                  {formatUTCtoLocalCalendarDate(
-                    booking.start_datetime,
-                    "yyyy-MM-dd"
-                  )}{" "}
-                  →{" "}
-                  {formatUTCtoLocalCalendarDate(
-                    booking.end_datetime,
-                    "yyyy-MM-dd"
-                  )}
-                </Typography>
-                <Typography sx={{ color: "#555" }}>
-                  {formatUTCtoLocalCalendarDate(
-                    booking.start_datetime,
-                    "HH:mm"
-                  )}{" "}
-                  →{" "}
-                  {formatUTCtoLocalCalendarDate(booking.end_datetime, "HH:mm")}
-                </Typography>
-              </Box>
-
-              {/* Recurring */}
-              <Box sx={{ mb: 2 }}>
-                <Box
-                  sx={{
-                    pl: 1,
-                    color: "#555",
-                    fontSize: "0.95rem",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {renderRecurringSchedule(booking.recurring)}
-                </Box>
-              </Box>
-
-              {/* Provider & Status */}
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={{ fontWeight: "600" }}>
-                  Client:
-                  <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {seeker[booking.service_seeker_id]?.first_name}{" "}
-                    {seeker[booking.service_seeker_id]?.last_name}
-                  </span>
-                </Typography>
-                <Typography sx={{ fontWeight: "600" }}>
-                  Address:
-                  <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {seeker[booking.service_seeker_id]?.home_address}
-                  </span>
-                </Typography>
-                <Typography sx={{ fontWeight: "600" }}>
-                  Phone Number:
-                  <span style={{ fontWeight: "normal", marginLeft: "6px" }}>
-                    {seeker[booking.service_seeker_id]?.phone_number}
-                  </span>
-                </Typography>
-              </Box>
-              {/* Cancel Button */}
-              <Box
-                sx={{ mt: 2, display: "flex", justifyContent: "space-around" }}
-              >
-                <Button
-                  variant="contained"
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: "600",
-                    px: 3,
-                    py: 1,
-                    borderRadius: "10px",
-                    width: "180px",
-                    backgroundColor: "#4caf50",
-                  }}
-                  onClick={() => handleAcceptOffer(booking.booking_id)}
-                  disabled={cancelLoadingId === booking.booking_id}
-                >
-                  {cancelLoadingId === booking._id ? (
-                    <CircularProgress size={20} sx={{ color: "white" }} />
-                  ) : (
-                    "Accept Offer"
-                  )}
-                </Button>
-                <Button
-                  variant="contained"
-                  color="error"
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: "600",
-                    px: 3,
-                    py: 1,
-                    borderRadius: "10px",
-                    width: "180px",
-                  }}
-                  onClick={() => handleRejectOffer(booking.booking_id)}
-                  disabled={cancelLoadingId === booking.booking_id}
-                >
-                  {cancelLoadingId === booking._id ? (
-                    <CircularProgress size={20} sx={{ color: "white" }} />
-                  ) : (
-                    "Reject Offer"
-                  )}
-                </Button>
-              </Box>
+              <Typography fontWeight="700" fontSize="1.2rem">
+                {booking.service_level}
+              </Typography>
+              <Typography fontWeight="700">{booking.price} CAD / hr</Typography>
             </Box>
-          ))
-        : !loading && (
-            <Paper sx={{ p: 3, mt: 3, textAlign: "center" }}>
-              <Typography>No bookings found.</Typography>
-            </Paper>
-          )}
+
+            {/* DATES */}
+            {booking.daily_bookings?.map((day, idx) => (
+              <Box key={idx} sx={{ mb: 1 }}>
+                <Typography fontWeight="600">
+                  {formatUTCDateOnly(day.date)}
+                </Typography>
+                <Typography color="text.secondary">
+                  {day.time_slots
+                    .map((s) => `${s.start} – ${s.end}`)
+                    .join(", ")}
+                </Typography>
+              </Box>
+            ))}
+
+            {/* CLIENT */}
+            {seeker && (
+              <Box sx={{ mt: 2 }}>
+                <Typography fontWeight="600">
+                  Client:{" "}
+                  <span style={{ fontWeight: 400 }}>
+                    {seeker.first_name} {seeker.last_name}
+                  </span>
+                </Typography>
+                <Typography fontWeight="600">
+                  Address:{" "}
+                  <span style={{ fontWeight: 400 }}>{seeker.home_address}</span>
+                </Typography>
+                <Typography fontWeight="600">
+                  Phone:{" "}
+                  <span style={{ fontWeight: 400 }}>{seeker.phone_number}</span>
+                </Typography>
+              </Box>
+            )}
+
+            {/* ACTIONS */}
+            <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                sx={{ backgroundColor: "#4749df" }}
+                disabled={actionLoadingId === booking.booking_id}
+                onClick={() => handleAccept(booking.booking_id)}
+              >
+                {actionLoadingId === booking.booking_id ? (
+                  <CircularProgress size={20} sx={{ color: "#fff" }} />
+                ) : (
+                  "Accept"
+                )}
+              </Button>
+
+              <Button
+                fullWidth
+                sx={{
+                  backgroundColor: "#efeffb",
+                  color: "#020e20",
+                  border: "solid #4749df 2px",
+                }}
+                disabled={actionLoadingId === booking.booking_id}
+                onClick={() => handleReject(booking.booking_id)}
+              >
+                {actionLoadingId === booking.booking_id ? (
+                  <CircularProgress size={20} sx={{ color: "#fff" }} />
+                ) : (
+                  "Reject"
+                )}
+              </Button>
+            </Box>
+          </Box>
+        );
+      })}
     </Box>
   );
 }

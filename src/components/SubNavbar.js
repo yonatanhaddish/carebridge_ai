@@ -43,6 +43,9 @@ function SubNavbar({ sendDataToParent }) {
         <Box onClick={() => handleClick("schedule")}>
           <Typography sx={styles.typo}>Schedule</Typography>
         </Box>
+        <Box onClick={() => handleClick("my_calendar")}>
+          <Typography sx={styles.typo}>My Calendar</Typography>
+        </Box>
       </Box>
     </Box>
   );

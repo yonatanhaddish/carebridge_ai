@@ -32,6 +32,7 @@ import AvailabilityAI from "@/components/AvailabilityAI";
 import AvailabiltiyCalendar from "@/components/AvailabiltiyCalendar";
 import Offers from "@/components/Offers";
 import Schedule from "@/components/Schedule";
+import MyCalendarSP from "@/components/MyCalendarSP";
 
 function DashboardServiceProvider() {
   const [selectedTab, setSelectedTab] = useState("availability_ai");
@@ -54,6 +55,8 @@ function DashboardServiceProvider() {
         <Offers />
       ) : selectedTab === "schedule" ? (
         <Schedule />
+      ) : selectedTab === "my_calendar" ? (
+        <MyCalendarSP />
       ) : (
         <></>
       )}

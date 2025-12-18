@@ -27,6 +27,9 @@ export default async function handler(req, res) {
       if (!booking) return res.status(404).json({ error: "Booking not found" });
 
       booking.status = "Confirmed";
+      booking.confirmed_at = new Date();
+      booking.cancelled_at = null;
+      booking.notes = `offer ACCEPT occured`;
       await booking.save();
 
       res.status(200).json({ success: true, message: "Booking confirmed" });
