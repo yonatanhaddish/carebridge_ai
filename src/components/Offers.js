@@ -40,6 +40,8 @@ export default function Offers() {
     }
   };
 
+  // console.log("1111111111111", bookings);
+  // console.log("222222222", seekers);
   useEffect(() => {
     fetchBookings();
   }, []);

@@ -35,13 +35,13 @@ export default function Offers() {
   };
 
   console.log("1111111111111", bookings);
-  console.log("222222222", seekers);
+  // console.log("222222222", seekers);
 
   useEffect(() => {
     fetchBookings();
   }, []);
-  /* ================= FETCH SEEKERS (BATCHED) ================= */
 
+  /* ================= FETCH SEEKERS (BATCHED) ================= */
   useEffect(() => {
     if (!bookings.length) return;
 
@@ -140,7 +140,6 @@ export default function Offers() {
       <Stack spacing={3}>
         {bookings.map((booking) => {
           const seeker = seekers[booking.service_seeker_id];
-          console.log("444", seeker);
 
           return (
             <Paper
