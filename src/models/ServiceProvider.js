@@ -58,8 +58,10 @@ const ServiceProviderSchema = new mongoose.Schema(
   }
 );
 
-// 2dsphere index allows "Find ServiceProvider within 10km" queries
-ServiceProviderSchema.index({ location_latitude: 1, location_longitude: 1 });
+ServiceProviderSchema.index(
+  { location_latitude: 1, location_longitude: 1 },
+  { name: "geo_index" }
+);
 
 export default mongoose.models.ServiceProvider ||
   mongoose.model("ServiceProvider", ServiceProviderSchema);

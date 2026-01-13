@@ -1,59 +1,68 @@
-import dbConnect from "../../../lib/mongoose";
-import User from "../../../models/User";
+import dbConnect from "@/lib/db";
+import User from "@/models/User";
 import bcrypt from "bcryptjs";
-import { signToken } from "../../../lib/jwt";
+import jwt from "jsonwebtoken";
+import { serialize } from "cookie"; // <--- 1. Import this
 
 export default async function handler(req, res) {
-  await dbConnect();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
 
-  if (req.method !== "POST")
-    return res.status(405).json({ error: "Method not allowed" });
+  try {
+    await dbConnect();
+    const { email, password, role } = req.body;
 
-  const { email, password, role } = req.body;
+    if (!email || !password || !role) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
-  // Validation
-  if (!email || !password || !role)
-    return res
-      .status(400)
-      .json({ error: "email, password, and role are required" });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ error: "User already exists" });
+    }
 
-  // Check if email exists
-  const existing = await User.findOne({ email });
-  if (existing)
-    return res.status(400).json({ error: "Email already registered" });
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
+    // Create user
+    const newUser = await User.create({
+      email,
+      password: hashedPassword,
+      role,
+    });
 
-  // Create user (UUID auto-generated)
-  const user = await User.create({
-    email,
-    password: hashedPassword,
-    role,
-  });
+    // --- GENERATE TOKEN ---
+    const token = jwt.sign(
+      { userId: newUser.user_id, email: newUser.email, role: newUser.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-  // Generate JWT with UUID instead of _id
-  const token = signToken({
-    user_id: user.user_id,
-    email: user.email,
-    role: user.role,
-  });
+    // --- 2. SET COOKIE HEADER (The Fix) ---
+    // This allows the user to be "logged in" immediately after signup
+    const cookie = serialize("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+    });
 
-  // Set cookie (7 days)
-  res.setHeader(
-    "Set-Cookie",
-    `token=${token}; HttpOnly; Path=/; Max-Age=604800`
-  );
+    res.setHeader("Set-Cookie", cookie);
 
-  // Response
-  res.status(201).json({
-    message: "User created successfully",
-    success: true,
-    user: {
-      user_id: user.user_id,
-      email: user.email,
-      role: user.role,
-    },
-    token,
-  });
+    return res.status(201).json({
+      message: "User created",
+      // token, <--- REMOVED. We don't need to send this anymore. The Cookie handles it.
+      user: {
+        id: newUser.user_id,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
+  } catch (error) {
+    console.error("Signup Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
 }

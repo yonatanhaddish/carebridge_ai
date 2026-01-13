@@ -79,7 +79,7 @@ function SignupServiceProvider() {
   };
 
   const handleLoginButton = () => {
-    router.push("/auth/loginServiceProvider"); // Make sure this page exists later
+    router.push("/auth/loginServiceProvider");
   };
   const handleGoHomeButton = () => {
     router.push("/");
@@ -95,11 +95,10 @@ function SignupServiceProvider() {
     }
 
     try {
-      // Calls our Backend API
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role: "Service Provider" }),
+        body: JSON.stringify({ email, password, role: "service_provider" }),
       });
 
       const data = await res.json();
@@ -116,8 +115,9 @@ function SignupServiceProvider() {
       setPassword("");
       setConfirmPassword("");
 
-      // Redirect to the Profile Creation page we discussed
-      router.push("/psw/profile");
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userEmail", email);
+      router.push("/service_provider/onboarding");
     } catch (err) {
       console.error(err);
       setError("An unexpected error occurred");
@@ -126,7 +126,6 @@ function SignupServiceProvider() {
 
   return (
     <Box sx={style.signupServiceProviderBox}>
-      {/* Navbar Area (Back Button) */}
       <Box sx={style.navbar_box}>
         <Button sx={style.button_back} onClick={handleGoHomeButton}>
           <ArrowBackIcon
@@ -134,8 +133,6 @@ function SignupServiceProvider() {
           />
         </Button>
       </Box>
-
-      {/* Main Form Area */}
       <Box
         component="form"
         autoComplete="off"

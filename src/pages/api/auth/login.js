@@ -1,51 +1,63 @@
-import dbConnect from "../../../lib/mongoose";
-import User from "../../../models/User";
+import dbConnect from "@/lib/db";
+import User from "@/models/User";
 import bcrypt from "bcryptjs";
-import { signToken } from "../../../lib/jwt";
+import jwt from "jsonwebtoken";
+import { serialize } from "cookie"; // <--- 1. Import this
 
 export default async function handler(req, res) {
-  await dbConnect();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
 
-  if (req.method !== "POST")
-    return res.status(405).json({ error: "Method not allowed" });
+  try {
+    await dbConnect();
+    const { email, password } = req.body;
 
-  const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing email or password" });
+    }
 
-  console.log("LOGIN ATTEMPT:", { email });
+    const user = await User.findOne({ email }).select("+password");
 
-  if (!email || !password)
-    return res.status(400).json({ error: "email and password required" });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
-  // Lookup user by email
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    const isMatch = await bcrypt.compare(password, user.password);
 
-  // Validate password
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
-  // 🔑 Sign JWT using UUID instead of _id
-  const token = signToken({
-    user_id: user.user_id,
-    email: user.email,
-    role: user.role,
-  });
+    // --- GENERATE TOKEN ---
+    const token = jwt.sign(
+      { userId: user.user_id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-  // Send HTTP-only cookie
-  res.setHeader(
-    "Set-Cookie",
-    `token=${token}; HttpOnly; Path=/; Max-Age=604800` // 7 days
-  );
+    // --- 2. SET COOKIE HEADER (The Fix) ---
+    const cookie = serialize("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+    });
 
-  // Response
-  res.status(200).json({
-    message: "User login successful",
-    success: true,
-    user: {
-      user_id: user.user_id, // 👈 UUID returned
-      email: user.email,
-      role: user.role,
-    },
-    token,
-  });
+    res.setHeader("Set-Cookie", cookie);
+
+    return res.status(200).json({
+      message: "Login successful",
+      // token, <--- Removed. We rely on the cookie now.
+      user: {
+        id: user.user_id,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Login Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
 }
