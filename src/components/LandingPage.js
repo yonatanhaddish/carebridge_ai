@@ -77,10 +77,10 @@ function LandingPage() {
   };
 
   const handleLoginServiceProvider = () => {
-    router.push("/loginServiceProvider");
+    router.push("/auth/loginServiceProvider");
   };
   const handleLoginServiceSeeker = () => {
-    router.push("/signupServiceSeeker");
+    router.push("/auth/signupServiceSeeker");
   };
   return (
     <Box sx={styles.landing_page_box}>
