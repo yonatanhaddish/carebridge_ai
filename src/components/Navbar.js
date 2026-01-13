@@ -59,10 +59,10 @@ function Navbar() {
   };
 
   const handleLoginServiceProvider = () => {
-    router.push("/signupServiceProvider");
+    router.push("auth/loginServiceProvider");
   };
   const handleLoginServiceSeeker = () => {
-    router.push("/signupServiceSeeker");
+    router.push("auth/loginServiceSeeker");
   };
   return (
     <Box sx={styles.navbar_box}>

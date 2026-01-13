@@ -2,25 +2,31 @@ import React, { useState } from "react";
 import { useRouter } from "next/router";
 import { Box, Typography, Button, TextField } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import Footer from "../components/Footer";
+// FIXED: Import Footer from the correct components folder
+import Footer from "../../components/Footer";
 
-function loginServiceSeeker() {
+// FIXED: Component name must be Capitalized
+function SignupServiceProvider() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
 
   const style = {
-    loginServiceSeekerBox: {
+    signupServiceProviderBox: {
       backgroundColor: "#e0e0e0",
       borderBottom: "1px solid #e0e0e0",
-      height: "100vh",
+      minHeight: "100vh", // Better for varying screen heights
+      display: "flex",
+      flexDirection: "column",
     },
 
     navbar_box: {
       height: "8%",
       display: "flex",
+      padding: "10px",
     },
 
     button_back: {
@@ -29,15 +35,18 @@ function loginServiceSeeker() {
       marginLeft: "3%",
       backgroundColor: "#020e20",
       height: "35px",
-      width: { xs: "45px", sm: "50px", md: "55px", lg: "60px", xl: "65px" },
+      minWidth: "45px", // improved responsiveness
+      "&:hover": {
+        backgroundColor: "#1a253a",
+      },
     },
 
     form_parent_box: {
-      height: "87%",
+      flexGrow: 1, // Takes up remaining space
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      // border: "solid green 2px",
+      padding: "20px 0",
     },
 
     form_subparent_box: {
@@ -51,22 +60,10 @@ function loginServiceSeeker() {
         lg: "35%",
         xl: "25%",
       },
-      height: {
-        xs: "auto",
-        md: "60%",
-        lg: "80%",
-      },
-      // border: "solid green 2px",
     },
 
-    button_login: {
-      height: {
-        xs: "60px",
-        sm: "70px",
-        md: "60px",
-        lg: "60px",
-        xl: "60px",
-      },
+    button_signup: {
+      height: { xs: "50px", md: "60px" },
       backgroundColor: "#4749df",
       borderRadius: "3px",
       display: "flex",
@@ -74,14 +71,15 @@ function loginServiceSeeker() {
       width: "80%",
       alignSelf: "center",
     },
-    button_signup: {
+    button_login: {
       width: "80%",
       alignSelf: "center",
+      textAlign: "center",
     },
   };
 
-  const handleSignupButton = () => {
-    router.push("/signupServiceSeeker");
+  const handleLoginButton = () => {
+    router.push("/auth/loginServiceProvider"); // Make sure this page exists later
   };
   const handleGoHomeButton = () => {
     router.push("/");
@@ -91,32 +89,44 @@ function loginServiceSeeker() {
     e.preventDefault();
     setError("");
 
+    if (password !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+
     try {
-      const res = await fetch("/api/auth/login", {
+      // Calls our Backend API
+      const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role: "Service Provider" }),
       });
+
       const data = await res.json();
 
-      console.log("4444444", data);
-
-      if (!data.success) {
-        setError(data.error || "Login failed");
-        setLoading(false);
+      if (!res.ok) {
+        // Check HTTP status, not just data.success
+        setError(data.error || "Signup failed");
+        alert(data.error || "Signup failed"); // Simple alert for now
         return;
       }
-      // Redirect to dashboard or landing page after signup
+
+      // Success!
       setEmail("");
       setPassword("");
-      router.push("/chatbot");
+      setConfirmPassword("");
+
+      // Redirect to the Profile Creation page we discussed
+      router.push("/psw/profile");
     } catch (err) {
+      console.error(err);
       setError("An unexpected error occurred");
-      console.log("error", err);
     }
   };
+
   return (
-    <Box sx={style.loginServiceSeekerBox}>
+    <Box sx={style.signupServiceProviderBox}>
+      {/* Navbar Area (Back Button) */}
       <Box sx={style.navbar_box}>
         <Button sx={style.button_back} onClick={handleGoHomeButton}>
           <ArrowBackIcon
@@ -125,6 +135,7 @@ function loginServiceSeeker() {
         </Button>
       </Box>
 
+      {/* Main Form Area */}
       <Box
         component="form"
         autoComplete="off"
@@ -135,33 +146,15 @@ function loginServiceSeeker() {
           <Typography
             sx={{ borderBottom: "1px solid #0e3b7a", color: "#4749df" }}
           >
-            <span style={{ fontSize: "2rem", color: "#020e20" }}>Login</span> |
-            Client
+            <span style={{ fontSize: "2rem", color: "#020e20" }}>Signup</span> |
+            PSW
           </Typography>
 
           <TextField
             required
-            value={email}
             label="Email"
-            InputLabelProps={{
-              shrink: true,
-              style: { color: "#020e20" },
-            }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { border: "2px solid #020e20" },
-                "&.Mui-focused fieldset": { border: "2px solid #020e20" },
-              },
-              width: "80%",
-              alignSelf: "center",
-            }}
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
-          />
-
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
             fullWidth
             InputLabelProps={{
               shrink: true,
@@ -175,28 +168,80 @@ function loginServiceSeeker() {
               width: "80%",
               alignSelf: "center",
             }}
-            onChange={(e) => setPassword(e.target.value)}
           />
 
-          <Box sx={style.button_login}>
-            <Button type="submit" sx={{ color: "#F7F7F7", width: "100%" }}>
-              Login
+          <TextField
+            required
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            fullWidth
+            InputLabelProps={{
+              shrink: true,
+              style: { color: "#020e20" },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                "&:hover fieldset": { border: "2px solid #020e20" },
+                "&.Mui-focused fieldset": { border: "2px solid #020e20" },
+              },
+              width: "80%",
+              alignSelf: "center",
+            }}
+          />
+
+          <TextField
+            required
+            label="Confirm Password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            fullWidth
+            InputLabelProps={{
+              shrink: true,
+              style: { color: "#020e20" },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                "&:hover fieldset": { border: "2px solid #020e20" },
+                "&.Mui-focused fieldset": { border: "2px solid #020e20" },
+              },
+              width: "80%",
+              alignSelf: "center",
+            }}
+          />
+
+          <Box sx={style.button_signup}>
+            <Button
+              type="submit"
+              sx={{
+                color: "#F7F7F7",
+                width: "100%",
+                height: "100%",
+                fontSize: "1.1rem",
+              }}
+            >
+              Sign Up
             </Button>
           </Box>
-          <Box sx={style.button_signup}>
+
+          <Box sx={style.button_login}>
             <Typography>
-              Don't have an account?
+              Already have an account?{" "}
               <Button
                 sx={{
                   color: "#020e20",
                   fontWeight: "bold",
+                  textTransform: "none",
                   "&:hover": {
-                    border: "solid #020e20 1px",
+                    backgroundColor: "transparent",
+                    textDecoration: "underline",
                   },
                 }}
-                onClick={handleSignupButton}
+                onClick={handleLoginButton}
               >
-                SignUp
+                Login
               </Button>
             </Typography>
           </Box>
@@ -208,4 +253,4 @@ function loginServiceSeeker() {
   );
 }
 
-export default loginServiceSeeker;
+export default SignupServiceProvider;
