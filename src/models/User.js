@@ -7,37 +7,29 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: uuidv4,
       unique: true,
-      index: true, // Fast lookup
+      index: true,
       required: true,
     },
-
     email: {
       type: String,
-      required: true,
+      required: [true, "Please provide an email"],
       unique: true,
-      index: true,
     },
-
     password: {
       type: String,
-      required: true,
+      required: [true, "Please provide a password"],
+      select: false, // Security: Hides password from queries by default
     },
-
     role: {
       type: String,
-      enum: ["Service Provider", "Service Seeker"],
-      required: true,
-    },
-
-    createdAt: {
-      type: Date,
-      default: Date.now,
+      enum: ["service_seeker", "service_provider", "team_lead", "super_admin"],
+      default: "service_seeker",
     },
   },
   {
-    timestamps: true, // Adds createdAt + updatedAt automatically
+    timestamps: true, // Automatically manages createdAt and updatedAt
   }
 );
 
-// Prevent Next.js model overwrite
+// Prevent Next.js from complaining if the model is already defined
 export default mongoose.models.User || mongoose.model("User", UserSchema);
