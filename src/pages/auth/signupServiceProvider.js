@@ -109,14 +109,10 @@ function SignupServiceProvider() {
         alert(data.error || "Signup failed"); // Simple alert for now
         return;
       }
-
-      // Success!
       setEmail("");
       setPassword("");
       setConfirmPassword("");
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("userEmail", email);
       router.push("/service_provider/onboarding");
     } catch (err) {
       console.error(err);

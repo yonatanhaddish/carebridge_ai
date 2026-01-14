@@ -1,15 +1,18 @@
 import React, { useState } from "react";
 import { useRouter } from "next/router";
-import { Box, Typography, Button, TextField } from "@mui/material";
+import { Box, Typography, Button, TextField, Alert } from "@mui/material"; // Added Alert
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Footer from "../../components/Footer";
 
-function loginServiceProvider() {
+// FIXED: Capitalized Component Name
+function LoginServiceProvider() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  // FIXED: Added loading state
+  const [loading, setLoading] = useState(false);
 
   const style = {
     loginServiceProviderBox: {
@@ -37,7 +40,6 @@ function loginServiceProvider() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      // border: "solid green 2px",
     },
 
     form_subparent_box: {
@@ -56,7 +58,6 @@ function loginServiceProvider() {
         md: "60%",
         lg: "80%",
       },
-      // border: "solid green 2px",
     },
 
     button_login: {
@@ -90,29 +91,36 @@ function loginServiceProvider() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true); // Start loading
 
     try {
+      // 1. Cookie is set automatically by the server response
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
 
-      if (!data.success) {
+      // 2. Check for HTTP Error (401/400/500)
+      if (!res.ok) {
         setError(data.error || "Login failed");
         setLoading(false);
         return;
       }
-      // Redirect to dashboard or landing page after signup
-      setEmail("");
-      setPassword("");
-      router.push("/chatbot");
+
+      // 3. Success!
+      // Redirect to where they need to go.
+      // NOTE: You might want to check if they have completed Onboarding here later.
+      router.push("/service_provider/dashboard");
     } catch (err) {
       setError("An unexpected error occurred");
       console.log("error", err);
+      setLoading(false);
     }
   };
+
   return (
     <Box sx={style.loginServiceProviderBox}>
       <Box sx={style.navbar_box}>
@@ -136,6 +144,9 @@ function loginServiceProvider() {
             <span style={{ fontSize: "2rem", color: "#020e20" }}>Login</span> |
             PSW
           </Typography>
+
+          {/* Added Error Alert for better UX */}
+          {error && <Alert severity="error">{error}</Alert>}
 
           <TextField
             required
@@ -177,8 +188,12 @@ function loginServiceProvider() {
           />
 
           <Box sx={style.button_login}>
-            <Button type="submit" sx={{ color: "#F7F7F7", width: "100%" }}>
-              Login
+            <Button
+              type="submit"
+              sx={{ color: "#F7F7F7", width: "100%", height: "100%" }}
+              disabled={loading}
+            >
+              {loading ? "Logging in..." : "Login"}
             </Button>
           </Box>
           <Box sx={style.button_signup}>
@@ -206,4 +221,4 @@ function loginServiceProvider() {
   );
 }
 
-export default loginServiceProvider;
+export default LoginServiceProvider;

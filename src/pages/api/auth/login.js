@@ -1,8 +1,9 @@
+// pages/api/auth/login.js
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
+import { signToken } from "@/lib/jwt"; // <--- Using your helper
+import { serialize } from "cookie";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { serialize } from "cookie"; // <--- 1. Import this
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -10,33 +11,39 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 1. Connect to Database
     await dbConnect();
+
     const { email, password } = req.body;
 
+    // 2. Validate Input
     if (!email || !password) {
       return res.status(400).json({ error: "Missing email or password" });
     }
 
+    // 3. Find User & Get Password
+    // .select("+password") is needed because password is usually hidden by default in Mongoose schemas
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // 4. Verify Password
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // --- GENERATE TOKEN ---
-    const token = jwt.sign(
-      { userId: user.user_id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    // 5. Generate Token (Using your lib/jwt.js helper)
+    const token = signToken({
+      userId: user.user_id,
+      email: user.email,
+      role: user.role,
+    });
 
-    // --- 2. SET COOKIE HEADER (The Fix) ---
+    // 6. Set HttpOnly Cookie
     const cookie = serialize("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -47,9 +54,9 @@ export default async function handler(req, res) {
 
     res.setHeader("Set-Cookie", cookie);
 
+    // 7. Return Success
     return res.status(200).json({
       message: "Login successful",
-      // token, <--- Removed. We rely on the cookie now.
       user: {
         id: user.user_id,
         email: user.email,

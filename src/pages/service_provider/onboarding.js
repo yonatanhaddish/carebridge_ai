@@ -272,7 +272,7 @@ function OnboardingServiceProvider() {
 
       // Keep loading true while redirecting to prevent double submission
       setTimeout(() => {
-        router.push("/service_provider/availability");
+        router.push("/service_provider/dashboard");
       }, 1000);
     } catch (err) {
       console.error(err);
