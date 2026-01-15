@@ -1,6 +1,7 @@
 // pages/api/auth/me.js
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
+import ServiceProvider from "@/models/ServiceProvider";
 import { authMiddleware } from "@/lib/auth"; // <--- The wrapper we made earlier
 
 async function handler(req, res) {
@@ -23,6 +24,12 @@ async function handler(req, res) {
       return res.status(404).json({ error: "User not found" });
     }
 
+    let hasOnboarded = false;
+    if (user.role === "service_provider") {
+      const profile = await ServiceProvider.findOne({ user_id: user.user_id });
+      hasOnboarded = !!profile;
+    }
+
     // 3. Return the user data
     return res.status(200).json({
       isAuthenticated: true,
@@ -31,6 +38,7 @@ async function handler(req, res) {
         email: user.email,
         role: user.role,
       },
+      hasOnboarded: hasOnboarded,
     });
   } catch (error) {
     console.error("Auth Me Error:", error);

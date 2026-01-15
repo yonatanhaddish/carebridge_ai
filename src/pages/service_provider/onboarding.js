@@ -95,11 +95,26 @@ function OnboardingServiceProvider() {
   };
 
   useEffect(() => {
-    const storedEmail = localStorage.getItem("userEmail");
-    if (storedEmail) {
-      setFormData((prev) => ({ ...prev, email: storedEmail }));
-    }
-  }, []);
+    const fetchUserSession = async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          // Auto-fill the email from the logged-in user
+          if (data.user?.email) {
+            setFormData((prev) => ({ ...prev, email: data.user.email }));
+          }
+        } else {
+          // If not logged in, kick them out
+          router.push("/auth/loginServiceProvider");
+        }
+      } catch (err) {
+        console.error("Session check failed", err);
+      }
+    };
+
+    fetchUserSession();
+  }, [router]);
 
   // --- GOOGLE MAPS AUTOCOMPLETE ---
   useEffect(() => {
@@ -212,13 +227,6 @@ function OnboardingServiceProvider() {
     setSuccessMsg("");
     setLoading(true);
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("You are not logged in. Please sign up again.");
-      setLoading(false);
-      return;
-    }
-
     // Validation: Ensure coordinates exist
     if (!formData.latitude || !formData.longitude) {
       setError("Please select a valid address from the dropdown list.");
@@ -243,7 +251,6 @@ function OnboardingServiceProvider() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           first_name: formData.firstName,

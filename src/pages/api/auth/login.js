@@ -1,6 +1,7 @@
 // pages/api/auth/login.js
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
+import ServiceProvider from "@/models/ServiceProvider";
 import { signToken } from "@/lib/jwt"; // <--- Using your helper
 import { serialize } from "cookie";
 import bcrypt from "bcryptjs";
@@ -27,6 +28,13 @@ export default async function handler(req, res) {
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Check if Service Provider has completed onboarding
+    let hasOnboarded = false;
+    if (user.role === "service_provider") {
+      const profile = await ServiceProvider.findOne({ user_id: user.user_id });
+      hasOnboarded = !!profile;
     }
 
     // 4. Verify Password
@@ -62,6 +70,7 @@ export default async function handler(req, res) {
         email: user.email,
         role: user.role,
       },
+      hasOnboarded: hasOnboarded,
     });
   } catch (error) {
     console.error("Login Error:", error);

@@ -110,10 +110,11 @@ function LoginServiceProvider() {
         return;
       }
 
-      // 3. Success!
-      // Redirect to where they need to go.
-      // NOTE: You might want to check if they have completed Onboarding here later.
-      router.push("/service_provider/dashboard");
+      if (data.hasOnboarded) {
+        router.push("/service_provider/availability");
+      } else {
+        router.push("/service_provider/onboarding");
+      }
     } catch (err) {
       setError("An unexpected error occurred");
       console.log("error", err);
