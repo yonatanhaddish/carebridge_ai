@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   // Try to get token from cookies
   if (req.headers.cookie) {
     const parsedCookies = cookie.parse(req.headers.cookie);
-    token = parsedCookies.token; // Assumes your cookie is named "token"
+    token = parsedCookies.token;
   }
 
   if (!token) {

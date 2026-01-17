@@ -1,6 +1,5 @@
 import dbConnect from "@/lib/db";
-import Availability from "@/models/Availability"; // Your existing model
-import ServiceProvider from "@/models/ServiceProvider";
+import ServiceProvider from "@/models/ServiceProvider"; // We update this model now
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 
@@ -8,7 +7,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method Not Allowed" });
 
-  // --- Auth Check (Cookie) ---
+  // 1. Auth Check
   let userId;
   try {
     const cookies = cookie.parse(req.headers.cookie || "");
@@ -16,7 +15,7 @@ export default async function handler(req, res) {
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    userId = decoded.userId; // This is a String (as per your User model)
+    userId = decoded.userId;
   } catch (err) {
     return res.status(401).json({ error: "Invalid token" });
   }
@@ -26,28 +25,15 @@ export default async function handler(req, res) {
   try {
     await dbConnect();
 
-    // 1. Verify Profile Exists
-    const profile = await ServiceProvider.findOne({ user_id: userId });
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found." });
-    }
-
-    // 2. Handle Replace Mode
-    if (mode === "replace") {
-      await Availability.deleteMany({ user_id: userId });
-    }
-
-    // 3. Transform & Save
+    // 2. Prepare the data objects
+    // We map them to match the structure expected inside 'availability_calendar.schedules'
     const newRules = schedules.map((rule) => ({
-      user_id: userId, // Matches String type in your Schema
-      type: rule.type,
+      type: rule.type, // "specific_date" or "recurring"
       startDate: new Date(rule.startDate),
       endDate: new Date(rule.endDate),
+      daysOfWeek: rule.daysOfWeek || [], // [1, 3] etc.
 
-      // AI now gives [1, 3], which matches your Schema [Number]
-      daysOfWeek: rule.daysOfWeek || [],
-
-      // Matches your TimeSlotSchema exactly
+      // Map slots to match your sub-schema
       slots: rule.slots.map((s) => ({
         startTime: s.startTime,
         endTime: s.endTime,
@@ -56,11 +42,37 @@ export default async function handler(req, res) {
       timezone: "America/Toronto",
     }));
 
-    if (newRules.length > 0) {
-      await Availability.insertMany(newRules);
+    // 3. Update the ServiceProvider Document
+    let updateOperation = {};
+
+    if (mode === "replace") {
+      // REPLACE: Overwrite the entire array
+      updateOperation = {
+        $set: { "availability_calendar.schedules": newRules },
+      };
+    } else {
+      // APPEND: Add to the existing array
+      updateOperation = {
+        $push: { "availability_calendar.schedules": { $each: newRules } },
+      };
     }
 
-    return res.status(200).json({ success: true, count: newRules.length });
+    // Execute the Update
+    const result = await ServiceProvider.findOneAndUpdate(
+      { user_id: userId }, // Find the profile by user_id
+      updateOperation,
+      { new: true } // Return the updated document
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: newRules.length,
+      updatedCalendar: result.availability_calendar,
+    });
   } catch (error) {
     console.error("Save Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });

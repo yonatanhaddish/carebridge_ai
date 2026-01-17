@@ -32,7 +32,7 @@ const mapWeekdays = (days) => {
 
 function AvailabilityAI() {
   const [command, setCommand] = useState("");
-  const [parsedData, setParsedData] = useState(null); // Stores the AI draft
+  const [parsedData, setParsedData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -47,7 +47,6 @@ function AvailabilityAI() {
     setError(null);
 
     try {
-      // 1. Send text to AI
       const res = await axios.post(
         "/api/ai/parseServiceProviderCommand",
         { command },
@@ -68,7 +67,6 @@ function AvailabilityAI() {
 
     setSaving(true);
     try {
-      // 2. Send JSON to Database
       await axios.post(
         "/api/service_provider/update_availability",
         { schedules: parsedData.schedules, mode: "append" },
@@ -87,8 +85,6 @@ function AvailabilityAI() {
     }
   };
 
-  // --- RENDER HELPERS ---
-  // --- RENDER HELPERS ---
   const renderPreview = (data) => {
     const schedules = data?.schedules || [];
     if (schedules.length === 0)
@@ -228,7 +224,7 @@ function AvailabilityAI() {
             onChange={(e) => setCommand(e.target.value)}
             placeholder="Example: Set my availability for next week only, Mon-Fri 10am to 6pm"
             sx={{ mb: 2, backgroundColor: "#f8f9fa" }}
-            disabled={loading || parsedData !== null} // Disable input while reviewing
+            disabled={loading || parsedData !== null}
           />
 
           {!parsedData && (
