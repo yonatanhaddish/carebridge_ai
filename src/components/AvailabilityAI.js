@@ -36,6 +36,8 @@ function AvailabilityAI() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // ✅ STATE FOR CONFLICTS
+  const [conflicts, setConflicts] = useState(null);
 
   // --- STEP 1: ANALYZE TEXT ---
   const handleAnalyze = async (e) => {
@@ -45,6 +47,7 @@ function AvailabilityAI() {
     setLoading(true);
     setParsedData(null);
     setError(null);
+    setConflicts(null); // Clear previous conflicts
 
     try {
       const res = await axios.post(
@@ -66,6 +69,9 @@ function AvailabilityAI() {
     if (!parsedData) return;
 
     setSaving(true);
+    setConflicts(null); // Clear previous conflicts
+    setError(null); // Clear previous errors
+
     try {
       await axios.post(
         "/api/service_provider/update_availability",
@@ -73,18 +79,32 @@ function AvailabilityAI() {
         { withCredentials: true }
       );
 
-      // Success!
+      // Success Path
       alert("Success! Your availability is live.");
       setCommand("");
       setParsedData(null);
     } catch (err) {
-      console.error("Save Error:", err);
-      alert("Failed to save: " + (err.response?.data?.error || err.message));
+      // 1. Log it for debugging (this causes the stack trace in console, which is fine)
+      console.log("Save request finished.");
+
+      // 2. Check for Conflict (409)
+      if (err.response && err.response.status === 409) {
+        // ✅ ONLY show the Yellow Box
+        setConflicts(err.response.data.conflicts);
+
+        // ❌ DO NOT set the Red Error box.
+        // We leave setError(null) so the UI stays clean.
+      } else {
+        // 3. Real Crash (Database down, 500, etc)
+        // NOW we show the Red Box
+        console.error("Critical Error:", err);
+        setError(err.response?.data?.error || "Failed to save.");
+      }
     } finally {
       setSaving(false);
     }
   };
-
+  // --- RENDER HELPERS ---
   const renderPreview = (data) => {
     const schedules = data?.schedules || [];
     if (schedules.length === 0)
@@ -113,7 +133,6 @@ function AvailabilityAI() {
               : null;
             const fullStart = format(parseISO(item.startDate), "MMM do, yyyy");
 
-            // Logic: Is it a single day or a range?
             const isRange = item.endDate && item.startDate !== item.endDate;
 
             return (
@@ -125,7 +144,6 @@ function AvailabilityAI() {
                         component="span"
                         sx={{ fontWeight: "bold", fontSize: "1.1rem" }}
                       >
-                        {/* 1. Show the Time Slots */}
                         {item.slots
                           .map((s) => `${s.startTime}-${s.endTime}`)
                           .join(", ")}
@@ -133,7 +151,6 @@ function AvailabilityAI() {
                     }
                     secondary={
                       <Box component="span" sx={{ display: "block", mt: 1 }}>
-                        {/* 2. Recurring Logic (e.g. Every Monday) */}
                         {item.type === "recurring" && (
                           <Chip
                             icon={<RecurringIcon sx={{ fontSize: 16 }} />}
@@ -144,8 +161,6 @@ function AvailabilityAI() {
                             sx={{ mr: 1, mb: 1 }}
                           />
                         )}
-
-                        {/* 3. Date Logic (The Fix) */}
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
@@ -154,13 +169,11 @@ function AvailabilityAI() {
                           />
                           <Typography variant="body2" component="span">
                             {isRange ? (
-                              // Case A: Range (April 10 - April 12)
                               <span style={{ fontWeight: 600 }}>
                                 {start}{" "}
                                 <span style={{ color: "#aaa" }}>to</span> {end}
                               </span>
                             ) : (
-                              // Case B: Single Day (April 10)
                               <span style={{ fontWeight: 600 }}>
                                 {fullStart}
                               </span>
@@ -197,6 +210,40 @@ function AvailabilityAI() {
           </Button>
         </Box>
       </Box>
+    );
+  };
+
+  // ✅ NEW: CONFLICT RENDERER
+  const renderConflicts = () => {
+    if (!conflicts || conflicts.length === 0) return null;
+
+    return (
+      <Alert severity="warning" sx={{ mt: 2, border: "1px solid #ff9800" }}>
+        <Typography
+          variant="subtitle2"
+          sx={{ fontWeight: "bold", display: "flex", alignItems: "center" }}
+        >
+          <ConflictIcon sx={{ mr: 1, fontSize: 20 }} />
+          Schedule Conflicts Detected
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          The following times overlap with your existing schedule:
+        </Typography>
+        <List dense>
+          {conflicts.map((c, i) => (
+            <ListItem key={i} sx={{ py: 0 }}>
+              <ListItemText
+                primary={
+                  <span style={{ fontWeight: 600, color: "#d32f2f" }}>
+                    {c.date}: {c.newTime}
+                  </span>
+                }
+                secondary={`Overlaps with existing: ${c.existingTime}`}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </Alert>
     );
   };
 
@@ -259,6 +306,9 @@ function AvailabilityAI() {
           sx={{ border: "1px solid #c8e6c9" }}
         >
           {renderPreview(parsedData)}
+
+          {/* ✅ SHOW CONFLICTS HERE */}
+          {renderConflicts()}
         </Alert>
       )}
     </Box>

@@ -82,6 +82,10 @@ export default async function handler(req, res) {
                - If the user specifies a month (e.g., "November") without a year:
                  a) If that month is LATER this year than "Today", use the CURRENT year.
                  b) If that month is BEFORE "Today" (or has already passed), use the NEXT year.
+
+            7. CRITICAL - HUMAN ERROR CORRECTION (Date Swapping):
+              - If the user provides a Start Date that is AFTER the End Date (e.g., "From May 20th to May 10th"), assume it was a typo.
+              - You MUST SWAP the dates. Set the earlier date as 'startDate' and the later date as 'endDate'.
             
             Return ONLY raw JSON. No markdown formatting.
           `,
