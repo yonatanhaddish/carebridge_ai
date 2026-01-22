@@ -1,20 +1,23 @@
-name: "CodeQL Scan"
+name: "Full Security Audit"
 
 permissions:
-  security-events: write # needed to upload results
-  contents: read # needed to access repo files
+  security-events: write
+  contents: read
+  actions: read # Needed for private repositories
 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  schedule:
+    - cron: "30 1 * * 0" # Runs every Sunday at 1:30 AM (catch new exploits on old code)
 
 jobs:
-  analyze:
-    name: Analyze Code
+  # 1. ENHANCED CODEQL (SAST)
+  codeql-analysis:
+    name: CodeQL Analysis
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -23,9 +26,49 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: javascript
+          # 'security-and-quality' finds bugs that aren't security risks YET, but could be.
+          queries: security-and-quality
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+
+  # 2. SECRET SCANNING (Prevent Leaks)
+  secret-scan:
+    name: Secret Scan (TruffleHog)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Scan all history, not just the latest commit
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: "${{ github.event.repository.default_branch }}"
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # 3. DEPENDENCY SCANNING (SCA)
+  dependency-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run NPM Audit
+        # Fails the build if a 'high' or 'critical' vulnerability is found in libraries
+        run: npm audit --audit-level=high
