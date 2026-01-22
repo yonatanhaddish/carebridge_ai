@@ -28,8 +28,6 @@ function doTimesClash(slotA, slotB) {
   return startA < endB && startB < endA;
 }
 
-// --- HELPER 3: Check if Days Overlap (THE FIX 🛠️) ---
-// This now correctly handles multi-day "Specific Date" ranges
 // --- HELPER 3: Check if Days Overlap (Fixed for Timezones 🌎) ---
 function doDaysOverlap(ruleA, ruleB) {
   // Internal helper to get all day numbers (0-6) for a rule
@@ -40,7 +38,6 @@ function doDaysOverlap(ruleA, ruleB) {
     }
 
     // B. Specific Date: Calculate based on the date string
-    // CRITICAL FIX: Use UTC methods to avoid timezone shifts (Saturday vs Sunday)
     let days = new Set();
 
     // Create new Date objects to avoid mutating the originals
@@ -49,8 +46,6 @@ function doDaysOverlap(ruleA, ruleB) {
 
     // Loop through dates
     while (current <= end) {
-      // 🛑 FIX: Use getUTCDay() instead of getDay()
-      // This ensures 2032-12-12 is ALWAYS 0 (Sunday), even in Toronto.
       days.add(current.getUTCDay());
 
       // Move to next day (UTC safe increment)
@@ -99,6 +94,8 @@ export default async function handler(req, res) {
       endDate: new Date(rule.endDate),
     }));
 
+    const dataConflict = [];
+
     // 4. CONFLICT CHECKING (Only if Appending)
     if (mode === "append") {
       const existingRules = userProfile.availability_calendar?.schedules || [];
@@ -119,9 +116,23 @@ export default async function handler(req, res) {
 
           // FUNNEL 3: TIME SLOT CHECK
           // Do the specific hours clash?
+          let hasConflict = false;
           for (const newSlot of newRule.slots) {
             for (const oldSlot of oldRule.slots) {
               if (doTimesClash(newSlot, oldSlot)) {
+                hasConflict = true;
+
+                // Add to conflicts array for Frontend display
+                dataConflict.push({
+                  message: `Conflict detected on ${newRule.startDate
+                    .toUTCString()
+                    .slice(0, 16)}`,
+                  requestedTime: `${newSlot.startTime} - ${newSlot.endTime}`,
+                  existingTime: `${oldSlot.startTime} - ${oldSlot.endTime} (Already Booked)`,
+                  newRule,
+                });
+
+                // console.log("22222", dataConflict);
                 // --- CONFLICT DETECTED! ---
                 return res.status(409).json({
                   error: "Conflict Detected",
@@ -129,6 +140,7 @@ export default async function handler(req, res) {
                     oldSlot.startTime
                   } and ${oldSlot.endTime}.`,
                   conflictRule: oldRule,
+                  dataConflict,
                 });
               }
             }

@@ -95,7 +95,7 @@ export default function AvailabiltiyCalendar() {
       }));
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/booking_calendar`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/update_availability_calendar`,
         { action: "add", bookingData }
       );
 
@@ -260,7 +260,7 @@ export default function AvailabiltiyCalendar() {
         {/* Notifications */}
         <Snackbar
           open={!!notification}
-          autoHideDuration={6000}
+          // autoHideDuration={6000}
           onClose={handleCloseNotification}
         >
           <Alert

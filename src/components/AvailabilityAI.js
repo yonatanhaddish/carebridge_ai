@@ -36,8 +36,8 @@ function AvailabilityAI() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  // ✅ STATE FOR CONFLICTS
   const [conflicts, setConflicts] = useState(null);
+  const [conflictObject, setConflictObject] = useState(null);
 
   // --- STEP 1: ANALYZE TEXT ---
   const handleAnalyze = async (e) => {
@@ -90,7 +90,8 @@ function AvailabilityAI() {
       // 2. Check for Conflict (409)
       if (err.response && err.response.status === 409) {
         // ✅ ONLY show the Yellow Box
-        setConflicts(err.response.data.conflicts);
+        setConflicts(err.response.data.dataConflict);
+        setConflictObject(err.response.data.dataConflict);
 
         // ❌ DO NOT set the Red Error box.
         // We leave setError(null) so the UI stays clean.
@@ -104,6 +105,8 @@ function AvailabilityAI() {
       setSaving(false);
     }
   };
+  // console.log("333", conflictObject);
+
   // --- RENDER HELPERS ---
   const renderPreview = (data) => {
     const schedules = data?.schedules || [];
@@ -212,16 +215,20 @@ function AvailabilityAI() {
       </Box>
     );
   };
-
+  // console.log("parsedData", parsedData);
   // ✅ NEW: CONFLICT RENDERER
   const renderConflicts = () => {
-    if (!conflicts || conflicts.length === 0) return null;
+    if (!conflictObject || conflictObject.length === 0) return null;
 
     return (
-      <Alert severity="warning" sx={{ mt: 2, border: "1px solid #ff9800" }}>
+      <Alert severity="error" icon={false} sx={{}}>
         <Typography
           variant="subtitle2"
-          sx={{ fontWeight: "bold", display: "flex", alignItems: "center" }}
+          sx={{
+            fontWeight: "bold",
+            display: "flex",
+            alignItems: "center",
+          }}
         >
           <ConflictIcon sx={{ mr: 1, fontSize: 20 }} />
           Schedule Conflicts Detected
@@ -230,19 +237,50 @@ function AvailabilityAI() {
           The following times overlap with your existing schedule:
         </Typography>
         <List dense>
-          {conflicts.map((c, i) => (
+          {conflictObject.map((c, i) => (
             <ListItem key={i} sx={{ py: 0 }}>
               <ListItemText
                 primary={
                   <span style={{ fontWeight: 600, color: "#d32f2f" }}>
-                    {c.date}: {c.newTime}
+                    {c.message}
                   </span>
                 }
-                secondary={`Overlaps with existing: ${c.existingTime}`}
+                secondary={
+                  <>
+                    <span style={{ fontWeight: 600 }}>
+                      Requested: {c.requestedTime}
+                    </span>
+                    <br />
+                    <span style={{ fontWeight: 600 }}>
+                      Existing: {c.existingTime}
+                    </span>
+                  </>
+                }
               />
             </ListItem>
           ))}
         </List>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 2,
+            justifyContent: "flex-start",
+            mt: 2,
+            // width: "100%",
+            // border: "solid blue 2px",
+          }}
+        >
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              setParsedData(null), setConflictObject(null);
+            }}
+            disabled={saving}
+          >
+            Discard
+          </Button>
+        </Box>
       </Alert>
     );
   };
@@ -299,15 +337,25 @@ function AvailabilityAI() {
       )}
 
       {/* --- PREVIEW SECTION --- */}
-      {parsedData && (
+      {parsedData && !conflictObject && (
         <Alert
           severity="success"
           icon={false}
           sx={{ border: "1px solid #c8e6c9" }}
         >
           {renderPreview(parsedData)}
-
           {/* ✅ SHOW CONFLICTS HERE */}
+        </Alert>
+      )}
+      {/* --- PREVIEW SECTION --- */}
+      {conflictObject && (
+        <Alert
+          severity="error"
+          icon={false}
+          sx={{
+            border: "1px solid #ffcdd2",
+          }}
+        >
           {renderConflicts()}
         </Alert>
       )}
@@ -316,3 +364,4 @@ function AvailabilityAI() {
 }
 
 export default AvailabilityAI;
+//  {renderConflicts()}
