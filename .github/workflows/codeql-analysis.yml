@@ -43,14 +43,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Scan all history, not just the latest commit
+          fetch-depth: 0 # TruffleHog still needs the full history
 
       - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: "${{ github.event.repository.default_branch }}"
-          head: HEAD
           extra_args: --debug --only-verified
 
   # 3. DEPENDENCY SCANNING (SCA)
