@@ -111,7 +111,7 @@ function LoginServiceProvider() {
       }
 
       if (data.hasOnboarded) {
-        router.push("/service_provider/availability");
+        router.push("/service_provider/dashboard");
       } else {
         router.push("/service_provider/onboarding");
       }

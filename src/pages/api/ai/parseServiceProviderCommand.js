@@ -12,34 +12,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  // ✅ FIXED: Auth Check using Cookies
   let token = null;
-
-  // Try to get token from cookies
   if (req.headers.cookie) {
     const parsedCookies = cookie.parse(req.headers.cookie);
     token = parsedCookies.token;
   }
 
   if (!token) {
-    return res.status(401).json({ error: "Unauthorized: No session found" });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
-    // Verify token
     jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
-
-  // --- The rest of your logic remains exactly the same ---
 
   const { command } = req.body;
   if (!command) {
     return res.status(400).json({ error: "No command provided" });
   }
 
-  // 2. Define "Today" for the AI (Context is critical for "Next Friday")
   const currentContext = new Date().toLocaleString("en-CA", {
     timeZone: "America/Toronto",
     weekday: "long",
@@ -49,7 +42,6 @@ export default async function handler(req, res) {
   });
 
   try {
-    // 3. Call OpenAI
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
