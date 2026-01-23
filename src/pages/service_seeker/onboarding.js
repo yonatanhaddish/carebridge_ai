@@ -1,23 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import Script from "next/script";
-import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  MenuItem,
-  Alert,
-} from "@mui/material";
+import { Box, Typography, Button, TextField, Alert } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import Footer from "../../components/Footer";
 
-const serviceLevelsEnum = ["Level 1", "Level 2", "Level 3"];
-
-function OnboardingServiceProvider() {
+function OnboardingServiceSeeker() {
   const router = useRouter();
   const addressRef = useRef(null);
-  const autoCompleteRef = useRef(null); // Keep reference to listener to clean up
+  const autoCompleteRef = useRef(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -29,17 +19,16 @@ function OnboardingServiceProvider() {
     country: "",
     latitude: "",
     longitude: "",
-    serviceLevels: [],
   });
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // --- STYLES ---
   const styles = {
-    registerBox: {
+    registerServiceSeekerBox: {
       backgroundColor: "#e0e0e0",
+      borderBottom: "1px solid #e0e0e0",
       minHeight: "100vh",
       display: "flex",
       flexDirection: "column",
@@ -48,28 +37,28 @@ function OnboardingServiceProvider() {
       height: "8%",
       display: "flex",
       alignItems: "center",
-      padding: "10px",
+      px: { xs: 2, md: 4 },
     },
     button_back: {
       border: "1px solid #020e20",
       backgroundColor: "#020e20",
       height: "35px",
       width: { xs: "45px", sm: "50px", md: "55px", lg: "60px", xl: "65px" },
-      "&:hover": { backgroundColor: "#1a253a" },
     },
     form_parent_box: {
       flex: 1,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "20px",
+      px: { xs: 2, md: 4 },
+      py: 2,
     },
     form_subparent_box: {
       display: "flex",
       flexDirection: "column",
       gap: "25px",
       width: { xs: "100%", sm: "90%", md: "80%", lg: "60%", xl: "50%" },
-      padding: { xs: 2, md: 4 },
+      p: { xs: 2, md: 4 },
       backgroundColor: "#f7f7f7",
       borderRadius: "8px",
       boxShadow: { xs: "none", md: "0px 4px 12px rgba(0,0,0,0.1)" },
@@ -105,7 +94,7 @@ function OnboardingServiceProvider() {
           }
         } else {
           // If not logged in, kick them out
-          router.push("/auth/loginServiceProvider");
+          router.push("/auth/loginServiceSeeker");
         }
       } catch (err) {
         console.error("Session check failed", err);
@@ -219,38 +208,23 @@ function OnboardingServiceProvider() {
     }
   };
 
-  // --- SUBMIT ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setError("");
     setSuccessMsg("");
-    setLoading(true);
 
-    // Validation: Ensure coordinates exist
     if (!formData.latitude || !formData.longitude) {
-      setError("Please select a valid address from the dropdown list.");
+      setError("Please select a valid address from the dropdown list");
       setLoading(false);
       return;
     }
 
-    // Default Prices - NOTE: Best practice is to calculate this on the Backend
-    const SERVICE_LEVEL_PRICES = {
-      "Level 1": 25,
-      "Level 2": 35,
-      "Level 3": 50,
-    };
-
-    const priceMap = {};
-    formData.serviceLevels.forEach((lvl) => {
-      priceMap[lvl] = SERVICE_LEVEL_PRICES[lvl];
-    });
-
     try {
-      const res = await fetch("/api/service_provider/create", {
+      const res = await fetch("/api/service_seeker/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           first_name: formData.firstName,
           last_name: formData.lastName,
@@ -258,11 +232,10 @@ function OnboardingServiceProvider() {
           phone_number: formData.phoneNumber,
           home_address: formData.homeAddress,
           postal_code: formData.postalCode,
-          country: formData.country,
-          location_latitude: parseFloat(formData.latitude),
-          location_longitude: parseFloat(formData.longitude),
-          service_levels_offered: formData.serviceLevels,
-          service_prices: priceMap,
+          location: {
+            type: "Point",
+            coordinates: [formData.longitude, formData.latitude],
+          },
         }),
       });
 
@@ -270,7 +243,7 @@ function OnboardingServiceProvider() {
 
       if (!res.ok) {
         setError(data.error || "Registration failed");
-        setLoading(false); // Only stop loading on error
+        setLoading(false);
         return;
       }
 
@@ -278,7 +251,7 @@ function OnboardingServiceProvider() {
 
       // Keep loading true while redirecting to prevent double submission
       setTimeout(() => {
-        router.push("/service_provider/dashboard");
+        router.push("/service_seeker/dashboard");
       }, 1000);
     } catch (err) {
       console.error(err);
@@ -288,7 +261,7 @@ function OnboardingServiceProvider() {
   };
 
   return (
-    <Box sx={styles.registerBox}>
+    <Box sx={styles.registerServiceSeekerBox}>
       <Script
         src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
         strategy="lazyOnload"
@@ -305,6 +278,7 @@ function OnboardingServiceProvider() {
         </Button>
       </Box>
 
+      {/* Form */}
       <Box
         component="form"
         autoComplete="off"
@@ -320,9 +294,10 @@ function OnboardingServiceProvider() {
               fontSize: { xs: "1.5rem", md: "2rem" },
             }}
           >
-            Onboarding | Service Provider
+            Register | Client
           </Typography>
 
+          {/* Alerts */}
           {error && (
             <Alert severity="error" sx={{ width: "80%", alignSelf: "center" }}>
               {error}
@@ -339,47 +314,43 @@ function OnboardingServiceProvider() {
 
           {/* Name Fields */}
           <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              width: "80%",
-              alignSelf: "center",
-              flexDirection: { xs: "column", sm: "row" },
-            }}
+            sx={{ display: "flex", gap: 2, width: "80%", alignSelf: "center" }}
           >
             <TextField
               required
               label="First Name"
               value={formData.firstName}
               onChange={handleInputChange("firstName")}
-              InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
-              sx={{
-                flex: 1,
-                ...styles.inputField,
-                width: { xs: "100%", sm: "auto" },
+              InputLabelProps={{
+                shrink: true,
+                style: { color: "#020e20" },
               }}
+              sx={{ flex: 1, ...styles.inputField }}
             />
             <TextField
               required
               label="Last Name"
               value={formData.lastName}
               onChange={handleInputChange("lastName")}
-              InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
-              sx={{
-                flex: 1,
-                ...styles.inputField,
-                width: { xs: "100%", sm: "auto" },
+              InputLabelProps={{
+                shrink: true,
+                style: { color: "#020e20" },
               }}
+              sx={{ flex: 1, ...styles.inputField }}
             />
           </Box>
 
+          {/* Contact Fields */}
           <TextField
             required
             label="Email"
             type="email"
             value={formData.email}
             onChange={handleInputChange("email")}
-            InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
+            InputLabelProps={{
+              shrink: true,
+              style: { color: "#020e20" },
+            }}
             sx={styles.inputField}
           />
           <TextField
@@ -387,7 +358,10 @@ function OnboardingServiceProvider() {
             label="Phone Number"
             value={formData.phoneNumber}
             onChange={handleInputChange("phoneNumber")}
-            InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
+            InputLabelProps={{
+              shrink: true,
+              style: { color: "#020e20" },
+            }}
             sx={styles.inputField}
           />
 
@@ -412,85 +386,50 @@ function OnboardingServiceProvider() {
           />
 
           <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              width: "80%",
-              alignSelf: "center",
-              flexDirection: { xs: "column", sm: "row" },
-            }}
+            sx={{ display: "flex", gap: 2, width: "80%", alignSelf: "center" }}
           >
             <TextField
               required
               label="Postal Code"
               value={formData.postalCode}
               onChange={handleInputChange("postalCode")}
-              InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
-              sx={{
-                flex: 1,
-                ...styles.inputField,
-                width: { xs: "100%", sm: "auto" },
+              InputLabelProps={{
+                shrink: true,
+                style: { color: "#020e20" },
               }}
+              sx={{ flex: 1, ...styles.inputField }}
             />
             <TextField
               required
               label="Country"
               value={formData.country}
               onChange={handleInputChange("country")}
-              InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
-              sx={{
-                flex: 1,
-                ...styles.inputField,
-                width: { xs: "100%", sm: "auto" },
+              InputLabelProps={{
+                shrink: true,
+                style: { color: "#020e20" },
               }}
+              sx={{ flex: 1, ...styles.inputField }}
             />
           </Box>
 
-          <TextField
-            select
-            required
-            label="Service Levels Offered"
-            value={formData.serviceLevels}
-            SelectProps={{ multiple: true }}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                serviceLevels:
-                  typeof e.target.value === "string"
-                    ? e.target.value.split(",")
-                    : e.target.value,
-              }))
-            }
-            InputLabelProps={{ shrink: true, style: { color: "#020e20" } }}
-            sx={styles.inputField}
-          >
-            {serviceLevelsEnum.map((lvl) => (
-              <MenuItem key={lvl} value={lvl}>
-                {lvl}
-              </MenuItem>
-            ))}
-          </TextField>
-
+          {/* Submit Button */}
           <Box sx={styles.button_register}>
             <Button
               type="submit"
               sx={{
-                color: "#f7f7f7",
+                color: "#F7F7F7",
                 width: "100%",
                 fontWeight: "bold",
-                height: "100%",
               }}
               disabled={loading}
             >
-              {loading ? "Saving Profile..." : "Next: Set Schedule"}
+              {loading ? "Creating..." : "Create Account"}
             </Button>
           </Box>
         </Box>
       </Box>
-
-      <Footer />
     </Box>
   );
 }
 
-export default OnboardingServiceProvider;
+export default OnboardingServiceSeeker;

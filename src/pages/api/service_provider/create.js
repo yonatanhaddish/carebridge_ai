@@ -1,6 +1,5 @@
 import dbConnect from "@/lib/db";
 import ServiceProvider from "@/models/ServiceProvider";
-// 1. Import your new middleware
 import { authMiddleware } from "@/lib/auth";
 
 // --- STANDARD MARKET RATES (DEFAULTS) ---

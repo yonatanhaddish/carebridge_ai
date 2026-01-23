@@ -2,7 +2,8 @@
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
 import ServiceProvider from "@/models/ServiceProvider";
-import { authMiddleware } from "@/lib/auth"; // <--- The wrapper we made earlier
+import ServiceSeeker from "@/models/ServiceSeeker";
+import { authMiddleware } from "@/lib/auth";
 
 async function handler(req, res) {
   // Only allow GET requests
@@ -27,6 +28,10 @@ async function handler(req, res) {
     let hasOnboarded = false;
     if (user.role === "service_provider") {
       const profile = await ServiceProvider.findOne({ user_id: user.user_id });
+      hasOnboarded = !!profile;
+    }
+    if (user.role === "service_seeker") {
+      const profile = await ServiceSeeker.findOne({ user_id: user.user_id });
       hasOnboarded = !!profile;
     }
 

@@ -2,6 +2,7 @@
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
 import ServiceProvider from "@/models/ServiceProvider";
+import ServiceSeeker from "@/models/ServiceSeeker";
 import { signToken } from "@/lib/jwt"; // <--- Using your helper
 import { serialize } from "cookie";
 import bcrypt from "bcryptjs";
@@ -34,6 +35,9 @@ export default async function handler(req, res) {
     let hasOnboarded = false;
     if (user.role === "service_provider") {
       const profile = await ServiceProvider.findOne({ user_id: user.user_id });
+      hasOnboarded = !!profile;
+    } else if (user.role === "service_seeker") {
+      const profile = await ServiceSeeker.findOne({ user_id: user.user_id });
       hasOnboarded = !!profile;
     }
 
