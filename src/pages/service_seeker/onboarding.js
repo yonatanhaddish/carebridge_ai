@@ -234,7 +234,10 @@ function OnboardingServiceSeeker() {
           postal_code: formData.postalCode,
           location: {
             type: "Point",
-            coordinates: [formData.longitude, formData.latitude],
+            coordinates: [
+              parseFloat(formData.longitude),
+              parseFloat(formData.latitude),
+            ],
           },
         }),
       });

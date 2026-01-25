@@ -47,7 +47,7 @@ function AvailabilityAI() {
     setLoading(true);
     setParsedData(null);
     setError(null);
-    setConflicts(null); // Clear previous conflicts
+    setConflicts(null);
 
     try {
       const res = await axios.post(
@@ -344,7 +344,6 @@ function AvailabilityAI() {
           sx={{ border: "1px solid #c8e6c9" }}
         >
           {renderPreview(parsedData)}
-          {/* ✅ SHOW CONFLICTS HERE */}
         </Alert>
       )}
       {/* --- PREVIEW SECTION --- */}

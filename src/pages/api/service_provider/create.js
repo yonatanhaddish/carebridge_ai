@@ -2,76 +2,64 @@ import dbConnect from "@/lib/db";
 import ServiceProvider from "@/models/ServiceProvider";
 import { authMiddleware } from "@/lib/auth";
 
-// --- STANDARD MARKET RATES (DEFAULTS) ---
-const DEFAULT_PRICES = {
-  "Level 1": 25.0, // Basic Care
-  "Level 2": 32.0, // Specialized Care
-  "Level 3": 45.0, // Complex Medical Care
-};
-
 async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  // 2. No more manual token parsing!
-  // The middleware has already verified the user by the time code reaches here.
+  // Auth Middleware gives us the User ID
   const { userId, email } = req.user;
 
   try {
     await dbConnect();
 
-    // Check if profile already exists for this user
+    // 1. Conflict Check: Does this user already have a profile?
     const existingProfile = await ServiceProvider.findOne({ user_id: userId });
     if (existingProfile) {
       return res.status(409).json({ error: "Profile already exists" });
     }
 
+    // 2. Destructure inputs from the NEW Frontend
     const {
       first_name,
       last_name,
       phone_number,
-      home_address,
-      postal_code,
-      location_latitude,
-      location_longitude,
-      service_levels_offered,
-      service_prices,
+      location, // This is now the { type: "Point", coordinates: [...] } object
+      service_level, // Single String "Level 1"
+      hourly_rate, // Single Number (e.g., 25)
     } = req.body;
 
-    if (!first_name || !home_address || !service_levels_offered) {
-      return res.status(400).json({ error: "Missing required fields" });
+    // 3. Validation
+    if (
+      !first_name ||
+      !location ||
+      !service_level ||
+      !last_name ||
+      !phone_number
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Missing required fields (Name, Location, or Level)" });
     }
 
-    // --- SMART PRICING LOGIC ---
-    const finalPrices = {};
-    const inputPrices = service_prices || {};
-
-    service_levels_offered.forEach((level) => {
-      if (inputPrices[level]) {
-        finalPrices[level] = inputPrices[level];
-      } else {
-        finalPrices[level] = DEFAULT_PRICES[level] || 25.0;
-      }
-    });
-
-    // --- CREATE PROFILE ---
+    // 4. Create the Profile (Matching New Model)
     const newProfile = await ServiceProvider.create({
       user_id: userId,
       first_name,
       last_name,
-      email: email,
+      email: email, // Enforced from Token
       phone_number,
-      home_address,
-      postal_code,
-      location_latitude,
-      location_longitude,
 
-      service_levels_offered,
-      service_prices: finalPrices,
+      // GeoJSON Location
+      location: location,
 
-      // Initialize empty calendar
-      availability_calendar: { schedules: [], exceptions: [] },
+      // Business Logic
+      service_level: service_level,
+      hourly_rate: hourly_rate,
+
+      // Initialize empty calendar structure
+      availability_calendar: { schedules: [] },
+      blocked_dates: [],
     });
 
     return res.status(201).json({
@@ -80,9 +68,14 @@ async function handler(req, res) {
     });
   } catch (error) {
     console.error("Create Profile Error:", error);
+    // Duplicate Key Error (e.g. Email already taken by another provider)
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ error: "Email or User ID already associated with a profile." });
+    }
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
 
-// 3. Wrap the handler with the middleware
 export default authMiddleware(handler);

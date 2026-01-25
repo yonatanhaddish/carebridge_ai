@@ -1,6 +1,40 @@
 import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 
+// --- Sub-Schemas for Availability (Matches AI & Search Logic) ---
+
+const timeSlotSchema = new mongoose.Schema(
+  {
+    startTime: { type: String, required: true }, // "09:00"
+    endTime: { type: String, required: true }, // "17:00"
+    crossesMidnight: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const scheduleRuleSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["specific_date", "recurring"],
+      required: true,
+    },
+
+    // Date Range (Used for both specific dates AND valid range for recurring)
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+
+    // Recurring Logic
+    daysOfWeek: { type: [Number], default: [] }, // 0=Sun, 1=Mon...
+
+    // The daily shifts
+    slots: [timeSlotSchema],
+  },
+  { _id: false }
+);
+
+// --- Main Schema ---
+
 const ServiceProviderSchema = new mongoose.Schema(
   {
     service_provider_id: {
@@ -10,42 +44,59 @@ const ServiceProviderSchema = new mongoose.Schema(
       index: true,
       required: true,
     },
-    // Link to the Login User
     user_id: {
       type: String,
       ref: "User",
       required: true,
       index: true,
+      unique: true, // One provider profile per user
     },
+
+    // --- Identity ---
     first_name: { type: String, required: true },
     last_name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phone_number: { type: String, required: true },
+    bio: { type: String }, // Nice to have for "Card" display
+    profile_photo: { type: String },
 
-    // Physical Location
-    home_address: { type: String, required: true },
-    postal_code: { type: String, required: true },
-    location_latitude: { type: Number, required: true },
-    location_longitude: { type: Number, required: true },
+    // --- 📍 LOCATION (GeoJSON - Required for Search API) ---
+    // Replaces the old lat/lng fields
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [Longitude, Latitude]
+        required: true,
+      },
+      // Keep address string for display
+      address_text: { type: String },
+      postal_code: { type: String },
+    },
 
-    // Business Logic
-    service_levels_offered: {
-      type: [String],
+    // --- Business Logic ---
+    service_level: {
+      type: String, // Simplified to single level for MVP, or keep array if multi-skilled
       enum: ["Level 1", "Level 2", "Level 3"],
-      default: ["Level 1"],
-    },
-    service_prices: {
-      type: Map,
-      of: Number, // e.g. { "Level 1": 25.00 }
-      default: {},
+      default: "Level 1",
+      index: true, // Indexed for fast filtering
     },
 
-    // THE IMPORTANT PART: The Calendar Structure
-    // We use "Mixed" because this will hold the complex JSON from the AI
+    hourly_rate: { type: Number, required: true, default: 25.0 },
+
+    // --- 📅 AVAILABILITY ENGINE ---
     availability_calendar: {
-      type: mongoose.Schema.Types.Mixed,
-      default: { schedules: [], exceptions: [] }, // Default empty structure
+      // The "Positive" Rules (When I AM working)
+      schedules: [scheduleRuleSchema],
     },
+
+    // The "Negative" Rules (Exceptions / Time Off)
+    // We check this array BEFORE checking Bookings.
+    // If a date is here, they are invisible in search.
+    blocked_dates: { type: [Date], default: [] },
 
     booking_confirmation_deadline_hours: { type: Number, default: 12 },
     required_advance_notice_hours: { type: Number, default: 24 },
@@ -58,10 +109,9 @@ const ServiceProviderSchema = new mongoose.Schema(
   }
 );
 
-ServiceProviderSchema.index(
-  { location_latitude: 1, location_longitude: 1 },
-  { name: "geo_index" }
-);
+// --- ⚡ INDEXES ---
+// 1. Geospatial Index (Vital for "Find providers near me")
+ServiceProviderSchema.index({ location: "2dsphere" });
 
 export default mongoose.models.ServiceProvider ||
   mongoose.model("ServiceProvider", ServiceProviderSchema);

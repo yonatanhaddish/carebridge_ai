@@ -226,24 +226,23 @@ function OnboardingServiceProvider() {
     setSuccessMsg("");
     setLoading(true);
 
-    // Validation: Ensure coordinates exist
     if (!formData.latitude || !formData.longitude) {
       setError("Please select a valid address from the dropdown list.");
       setLoading(false);
       return;
     }
 
-    // Default Prices - NOTE: Best practice is to calculate this on the Backend
+    // Rate Logic
     const SERVICE_LEVEL_PRICES = {
       "Level 1": 25,
       "Level 2": 35,
       "Level 3": 50,
     };
 
-    const priceMap = {};
-    formData.serviceLevels.forEach((lvl) => {
-      priceMap[lvl] = SERVICE_LEVEL_PRICES[lvl];
-    });
+    // New Model Logic: We need a PRIMARY level (String).
+    // If user selects multiple, we pick the first one as the primary "Role".
+    const primaryLevel = formData.serviceLevels[0] || "Level 1";
+    const hourlyRate = SERVICE_LEVEL_PRICES[primaryLevel] || 25;
 
     try {
       const res = await fetch("/api/service_provider/create", {
@@ -252,17 +251,26 @@ function OnboardingServiceProvider() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          // Identity
           first_name: formData.firstName,
           last_name: formData.lastName,
           email: formData.email,
           phone_number: formData.phoneNumber,
-          home_address: formData.homeAddress,
-          postal_code: formData.postalCode,
-          country: formData.country,
-          location_latitude: parseFloat(formData.latitude),
-          location_longitude: parseFloat(formData.longitude),
-          service_levels_offered: formData.serviceLevels,
-          service_prices: priceMap,
+
+          // GeoJSON Location (The Fix)
+          location: {
+            type: "Point",
+            coordinates: [
+              parseFloat(formData.longitude),
+              parseFloat(formData.latitude),
+            ], // [Lng, Lat]
+            address_text: formData.homeAddress,
+            postal_code: formData.postalCode,
+          },
+
+          // Business Logic (Strict Schema Match)
+          service_level: primaryLevel,
+          hourly_rate: hourlyRate,
         }),
       });
 
@@ -270,13 +278,11 @@ function OnboardingServiceProvider() {
 
       if (!res.ok) {
         setError(data.error || "Registration failed");
-        setLoading(false); // Only stop loading on error
+        setLoading(false);
         return;
       }
 
       setSuccessMsg("Profile created successfully!");
-
-      // Keep loading true while redirecting to prevent double submission
       setTimeout(() => {
         router.push("/service_provider/dashboard");
       }, 1000);
@@ -286,7 +292,6 @@ function OnboardingServiceProvider() {
       setLoading(false);
     }
   };
-
   return (
     <Box sx={styles.registerBox}>
       <Script

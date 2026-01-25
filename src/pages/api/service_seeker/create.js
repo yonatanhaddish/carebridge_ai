@@ -30,7 +30,7 @@ async function handler(req, res) {
     console.log(req.body);
     console.log("existingProfile", existingProfile);
 
-    if (!first_name || !home_address || !phone_number || !home_address) {
+    if (!first_name || !last_name || !phone_number || !location) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 

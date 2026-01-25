@@ -2,7 +2,6 @@ import dbConnect from "@/lib/db";
 import ServiceProvider from "@/models/ServiceProvider";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
-import { addDays, getDay } from "date-fns";
 
 // --- HELPER 1: Convert "HH:MM" to Minutes (Handles Midnight!) ---
 function getMinutes(timeStr, crossesMidnight = false) {
@@ -165,7 +164,7 @@ export default async function handler(req, res) {
     const result = await ServiceProvider.findOneAndUpdate(
       { user_id: userId },
       updateOperation,
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     return res.status(200).json({

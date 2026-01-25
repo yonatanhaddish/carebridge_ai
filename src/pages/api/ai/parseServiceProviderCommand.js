@@ -78,6 +78,10 @@ export default async function handler(req, res) {
             7. CRITICAL - HUMAN ERROR CORRECTION (Date Swapping):
               - If the user provides a Start Date that is AFTER the End Date (e.g., "From May 20th to May 10th"), assume it was a typo.
               - You MUST SWAP the dates. Set the earlier date as 'startDate' and the later date as 'endDate'.
+
+            8. 🛡️ REALITY CHECK & ERRORS:
+              - If the user enters a non-existent date (e.g., "February 31st"), return: { "error": "Invalid Date: [Date] does not exist." }
+              - If the user provides dates but NO time range, return: { "error": "Please specify a time range." }
             
             Return ONLY raw JSON. No markdown formatting.
           `,
