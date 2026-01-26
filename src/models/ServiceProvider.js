@@ -79,13 +79,17 @@ const ServiceProviderSchema = new mongoose.Schema(
 
     // --- Business Logic ---
     service_level: {
-      type: String, // Simplified to single level for MVP, or keep array if multi-skilled
+      type: [String], // Allow multiple service levels
       enum: ["Level 1", "Level 2", "Level 3"],
-      default: "Level 1",
+      default: ["Level 1"],
       index: true, // Indexed for fast filtering
     },
 
-    hourly_rate: { type: Number, required: true, default: 25.0 },
+    hourly_rates: {
+      type: Map, // Allows keys like "Level 1", "Level 2"
+      of: Number, // Values must be numbers (25, 35...)
+      default: {},
+    },
 
     // --- 📅 AVAILABILITY ENGINE ---
     availability_calendar: {

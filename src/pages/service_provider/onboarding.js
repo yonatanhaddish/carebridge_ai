@@ -226,23 +226,28 @@ function OnboardingServiceProvider() {
     setSuccessMsg("");
     setLoading(true);
 
-    if (!formData.latitude || !formData.longitude) {
-      setError("Please select a valid address from the dropdown list.");
-      setLoading(false);
-      return;
-    }
-
-    // Rate Logic
     const SERVICE_LEVEL_PRICES = {
       "Level 1": 25,
       "Level 2": 35,
       "Level 3": 50,
     };
 
-    // New Model Logic: We need a PRIMARY level (String).
-    // If user selects multiple, we pick the first one as the primary "Role".
-    const primaryLevel = formData.serviceLevels[0] || "Level 1";
-    const hourlyRate = SERVICE_LEVEL_PRICES[primaryLevel] || 25;
+    if (!formData.latitude || !formData.longitude) {
+      setError("Please select a valid address from the dropdown list.");
+      setLoading(false);
+      return;
+    }
+
+    const ratesObject = {};
+    const levels =
+      formData.serviceLevels.length > 0 ? formData.serviceLevels : ["Level 1"];
+
+    levels.forEach((lvl) => {
+      // Map the level name to its price
+      ratesObject[lvl] = SERVICE_LEVEL_PRICES[lvl] || 25;
+    });
+
+    console.log("Submitting with rates:", ratesObject);
 
     try {
       const res = await fetch("/api/service_provider/create", {
@@ -257,7 +262,7 @@ function OnboardingServiceProvider() {
           email: formData.email,
           phone_number: formData.phoneNumber,
 
-          // GeoJSON Location (The Fix)
+          // GeoJSON Location
           location: {
             type: "Point",
             coordinates: [
@@ -266,11 +271,15 @@ function OnboardingServiceProvider() {
             ], // [Lng, Lat]
             address_text: formData.homeAddress,
             postal_code: formData.postalCode,
+            hourly_rates: ratesObject,
           },
 
-          // Business Logic (Strict Schema Match)
-          service_level: primaryLevel,
-          hourly_rate: hourlyRate,
+          // Business Logic
+          // ✅ FIX: Send the ARRAY, not just the string (Matches your new Schema)
+          service_level: levels,
+
+          // ✅ FIX: Send the calculated variable, not the undefined one
+          hourly_rates: ratesObject,
         }),
       });
 

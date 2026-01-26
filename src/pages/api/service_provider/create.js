@@ -26,9 +26,11 @@ async function handler(req, res) {
       phone_number,
       location, // This is now the { type: "Point", coordinates: [...] } object
       service_level, // Single String "Level 1"
-      hourly_rate, // Single Number (e.g., 25)
+      hourly_rates,
     } = req.body;
+    console.log("Create Profile Input:", req.body);
 
+    console.log("hourly_rates:", hourly_rates);
     // 3. Validation
     if (
       !first_name ||
@@ -55,7 +57,7 @@ async function handler(req, res) {
 
       // Business Logic
       service_level: service_level,
-      hourly_rate: hourly_rate,
+      hourly_rates: hourly_rates,
 
       // Initialize empty calendar structure
       availability_calendar: { schedules: [] },
