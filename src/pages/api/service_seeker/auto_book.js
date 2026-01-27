@@ -168,7 +168,7 @@ async function handler(req, res) {
       // --- CHECK B: IS PROVIDER BOOKED? (Conflict) ---
       const conflictCount = await Booking.countDocuments({
         service_provider_id: provider.service_provider_id,
-        status: { $in: ["Confirmed", "Pending"] },
+        status: { $in: ["Confirmed", "Pending", "Completed"] },
 
         // Date Overlap
         start_date: { $lte: reqEndDate },

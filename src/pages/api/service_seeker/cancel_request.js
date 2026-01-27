@@ -1,7 +1,7 @@
 import dbConnect from "@/lib/db";
 import Booking from "@/models/Booking";
-import ServiceProvider from "@/models/ServiceProvider";
 import { authMiddleware } from "@/lib/auth";
+import ServiceSeeker from "@/models/ServiceSeeker";
 
 async function handler(req, res) {
   if (req.method !== "POST")
@@ -12,26 +12,26 @@ async function handler(req, res) {
 
   try {
     await dbConnect();
-    const provider = await ServiceProvider.findOne({ user_id: userId });
+    const provider = await ServiceSeeker.findOne({ user_id: userId });
 
     // Find the booking (Authorized)
     const booking = await Booking.findOne({
       booking_id: booking_id,
-      service_provider_id: provider.service_provider_id,
+      service_seeker_id: provider.service_seeker_id,
     });
 
     if (!booking) return res.status(404).json({ error: "Booking not found." });
 
-    // Allow cancelling Confirmed or Pending
-    if (!["Confirmed", "Pending"].includes(booking.status)) {
-      return res
-        .status(400)
-        .json({ error: "Cannot cancel a completed or rejected booking." });
-    }
+    // // Allow cancelling Confirmed or Pending
+    // if (!["Confirmed", "Pending"].includes(booking.status)) {
+    //   return res
+    //     .status(400)
+    //     .json({ error: "Cannot cancel a completed or rejected booking." });
+    // }
 
     // Update Status
     booking.status = "Cancelled";
-    booking.notes = `(Cancelled by ${provider.name})`;
+    booking.notes = (booking.notes || "") + " (Cancelled by Seeker)";
     await booking.save();
 
     return res

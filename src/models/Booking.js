@@ -9,6 +9,7 @@ const STATUS_ENUM = [
   "Rejected",
   "Cancelled",
   "Completed",
+  "Accepted",
 ];
 const BOOKING_TYPES = ["specific_date", "recurring"];
 
