@@ -10,13 +10,19 @@ import axios from "axios";
 import { format, parseISO } from "date-fns";
 
 // --- Helper Date Formatter ---
-export function formatUTCtoLocalCalendarDate(
-  utcDateStr,
-  fmt = "yyyy-MM-dd HH:mm"
-) {
+export function formatUTCtoLocalCalendarDate(utcDateStr, fmt = "yyyy-MM-dd") {
   if (!utcDateStr) return "";
-  const date =
-    typeof utcDateStr === "string" ? parseISO(utcDateStr) : utcDateStr;
+
+  // 1. If it's a full ISO string (e.g., "2026-03-09T00:00:00.000Z"),
+  //    we slice off the "T..." part to get just "2026-03-09".
+  const dateOnlyString =
+    typeof utcDateStr === "string" ? utcDateStr.split("T")[0] : utcDateStr;
+
+  // 2. parseISO("2026-03-09") creates a date at LOCAL midnight (00:00 EST),
+  //    keeping the day as the 9th.
+  const date = parseISO(dateOnlyString);
+
+  // 3. Format it
   return format(date, fmt);
 }
 
@@ -45,6 +51,8 @@ export default function Offers() {
   useEffect(() => {
     fetchBookings();
   }, []);
+
+  // console.log("bookings", bookings);
 
   const handleRejectOffer = async (bookingId) => {
     if (!confirm("Are you sure you want to reject this booking?")) return;
@@ -86,6 +94,44 @@ export default function Offers() {
     }
   };
 
+  const calculateTotal = (booking) => {
+    // 1. If database has the total, use it directly (Best Case)
+    if (booking.total_estimated_cost) {
+      return booking.total_estimated_cost.toFixed(2);
+    }
+
+    // 2. Fallback: Calculate manually (Slots × Days × Rate)
+    if (booking.slots && booking.slots.length > 0) {
+      const slot = booking.slots[0];
+
+      // --- A. Calculate Hours Per Day ---
+      const startHour = parseInt(slot.startTime.split(":")[0], 10);
+      const endHour = parseInt(slot.endTime.split(":")[0], 10);
+
+      let dailyHours = endHour - startHour;
+      if (dailyHours <= 0) dailyHours = 1; // Minimum 1 hour safety
+
+      // --- B. Calculate Number of Days ---
+      const startDate = new Date(booking.start_date);
+      const endDate = new Date(booking.end_date);
+
+      // Normalize to midnight to ignore time differences
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      // Get difference in time (milliseconds)
+      const diffTime = Math.abs(endDate - startDate);
+      // Convert to days + 1 (because May 12 to May 12 is 1 day, not 0)
+      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      // --- C. Final Total ---
+      return (dailyHours * totalDays * booking.hourly_rate).toFixed(2);
+    }
+
+    // 3. Last Resort: Just return the hourly rate
+    return booking.hourly_rate.toFixed(2);
+  };
+
   return (
     <Box sx={{ p: 4, maxWidth: 900, margin: "auto" }}>
       <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
@@ -114,12 +160,13 @@ export default function Offers() {
             <Box
               key={booking.booking_id}
               sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: "12px",
-                p: 3,
-                mb: 3,
-                backgroundColor: "#F9FAFB",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                border: "solid #000 2px",
+                borderRadius: 2,
+                backgroundColor: "#fff",
+                boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
               }}
             >
               {/* --- HEADER --- */}
@@ -127,62 +174,86 @@ export default function Offers() {
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
-                  borderBottom: "1px solid #eee",
-                  pb: 2,
-                  mb: 2,
+                  margin: "0 auto",
+                  pt: 2,
+                  width: "94%",
+                  // border: "solid red 2px",
                 }}
               >
                 <Typography
-                  sx={{ fontWeight: "700", fontSize: "1.2rem", color: "#333" }}
+                  sx={{
+                    fontWeight: "600",
+                    fontSize: "1.1rem",
+                    // backgroundColor: "#4749df",
+                    color: "#4749df",
+                    textAlign: "center",
+                  }}
                 >
-                  {booking.service_level} Request
+                  {booking.service_level} ↔ ${booking.hourly_rate} / hr
                 </Typography>
                 <Typography
                   sx={{
-                    fontWeight: "700",
-                    fontSize: "1.2rem",
-                    color: "#1976d2",
+                    mb: 1,
+                    backgroundColor: "#efeffb",
+                    width: "150px",
+                    textAlign: "center",
+                    borderRadius: "60px",
+                    alignSelf: "center",
+                    border: "solid 1px #4749df",
                   }}
                 >
-                  ${booking.hourly_rate} / hr
+                  Pending
                 </Typography>
               </Box>
 
               {/* --- DATES --- */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  DATE & TIME
-                </Typography>
-                <Typography variant="body1" fontWeight={500}>
+              <Box
+                sx={{
+                  // border: "solid red 2px",
+                  width: "96%",
+                  margin: "0 auto",
+                  // mt: 1,
+                  // p: 2,
+                  // border: "solid red 2px",
+                }}
+              >
+                <Typography sx={{ mb: 1, color: "#555" }}>
+                  <b>📅</b>{" "}
                   {formatUTCtoLocalCalendarDate(
                     booking.start_date,
-                    "EEE, MMM d, yyyy"
-                  )}
-                  {" — "}
+                    "MMM dd, yyyy"
+                  )}{" "}
+                  to{" "}
                   {formatUTCtoLocalCalendarDate(
                     booking.end_date,
-                    "EEE, MMM d, yyyy"
+                    "MMM dd, yyyy"
                   )}
                 </Typography>
 
                 {/* Show Time Slots */}
                 {booking.slots &&
                   booking.slots.map((slot, idx) => (
-                    <Typography key={idx} variant="body2" sx={{ mt: 0.5 }}>
-                      🕒 {slot.startTime} - {slot.endTime}
-                      {slot.crossesMidnight ? " (Next Day)" : ""}
+                    <Typography
+                      sx={{ mb: 2, color: "#555", fontSize: "0.9rem" }}
+                    >
+                      ⏰ {booking.slots?.[0]?.startTime} -{" "}
+                      {booking.slots?.[0]?.endTime}
                     </Typography>
                   ))}
+                <Typography sx={{ mt: -1 }}>
+                  💲 {calculateTotal(booking)}
+                </Typography>
               </Box>
 
               {/* --- CLIENT INFO --- */}
               <Box
                 sx={{
-                  mb: 3,
                   bgcolor: "#fff",
-                  p: 2,
                   borderRadius: 2,
-                  border: "1px solid #eee",
+                  // border: "solid red 2px",
+                  width: "96%",
+                  margin: "0 auto",
+                  // p: 2,
                 }}
               >
                 <Typography
@@ -192,57 +263,68 @@ export default function Offers() {
                 >
                   CLIENT DETAILS
                 </Typography>
-
                 <Typography sx={{ fontWeight: "600" }}>
-                  Name:{" "}
-                  <span style={{ fontWeight: "normal" }}>
+                  👨{" "}
+                  <span style={{ fontWeight: "600" }}>
                     {booking.seeker_first_name} {booking.seeker_last_name}
                   </span>
                 </Typography>
-
                 <Typography sx={{ fontWeight: "600", mt: 1 }}>
-                  Location:{" "}
+                  🏠{" "}
                   <span style={{ fontWeight: "normal" }}>
                     {booking.location?.address || "Location provided on map"}
                   </span>
                 </Typography>
-
                 <Typography sx={{ fontWeight: "600", mt: 1, color: "#888" }}>
-                  Phone:{" "}
+                  📞{" "}
+                  <span
+                    style={{
+                      fontWeight: "normal",
+                      fontStyle: "italic",
+                      backgroundColor: "#000",
+                      color: "#000",
+                    }}
+                  >
+                    111-222-3333
+                  </span>
                   <span style={{ fontWeight: "normal", fontStyle: "italic" }}>
-                    Hidden until Accepted -- coming soon!!!
+                    (Once accepted phone number will be visible)
                   </span>
                 </Typography>
-
-                {booking.notes && (
-                  <Typography sx={{ fontWeight: "600", mt: 1 }}>
-                    Notes:{" "}
-                    <span style={{ fontWeight: "normal" }}>
-                      {booking.notes}
-                    </span>
-                  </Typography>
-                )}
               </Box>
 
               {/* --- ACTIONS --- */}
-              <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 2,
+                  justifyContent: "space-around",
+                  alignSelf: "end",
+                  // border: "solid red 2px",
+                  width: "60%",
+                  pb: 2,
+                }}
+              >
                 <Button
                   variant="outlined"
-                  color="error"
                   onClick={() => handleRejectOffer(booking.booking_id)}
                   disabled={!!actionLoadingId}
+                  sx={{
+                    width: "40%",
+                    border: "solid 2px #4749df",
+                    color: "#020e20",
+                  }}
                 >
                   {actionLoadingId === booking.booking_id
                     ? "Processing..."
-                    : "Decline"}
+                    : "Reject"}
                 </Button>
 
                 <Button
                   variant="contained"
-                  color="success"
                   onClick={() => handleAcceptOffer(booking.booking_id)}
                   disabled={!!actionLoadingId}
-                  sx={{ px: 4 }}
+                  sx={{ width: "40%", backgroundColor: "#4749fd" }}
                 >
                   {actionLoadingId === booking.booking_id ? (
                     <CircularProgress size={24} color="inherit" />

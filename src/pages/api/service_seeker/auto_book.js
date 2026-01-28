@@ -141,7 +141,7 @@ async function handler(req, res) {
         .status(404)
         .json({ error: "No providers found nearby with that skill level." });
     }
-
+    console.log("Candidates Found:", candidates);
     // 4. Vetting Loop
     let bestProvider = null;
     let correctRate = 25;

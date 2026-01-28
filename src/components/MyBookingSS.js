@@ -67,7 +67,9 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
   );
 
   const pastBookings = bookings.filter((b) => ["Completed"].includes(b.status));
-  console.log("activeBookings", activeBookings);
+  console.log("pendingBookings", pendingBookings);
+  console.log("acceptedBookings", activeBookings);
+  console.log("historyBooking", pastBookings);
   const handleCancel = async (bookingId) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     setCancelLoadingId(bookingId);
@@ -89,125 +91,46 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
   const handleShowStatus = (status) => {
     setShowListStatus(status);
   };
+
   const calculateTotal = (booking) => {
-    // 1. If database has the total, use it directly
+    // 1. If database has the total, use it directly (Best Case)
     if (booking.total_estimated_cost) {
       return booking.total_estimated_cost.toFixed(2);
     }
 
-    // 2. Fallback: Calculate manually from slots
+    // 2. Fallback: Calculate manually (Slots × Days × Rate)
     if (booking.slots && booking.slots.length > 0) {
       const slot = booking.slots[0];
 
-      // Extract hours (e.g. "14:00" -> 14)
+      // --- A. Calculate Hours Per Day ---
       const startHour = parseInt(slot.startTime.split(":")[0], 10);
       const endHour = parseInt(slot.endTime.split(":")[0], 10);
 
-      // Calculate duration (Minimum 1 hour to avoid $0 on errors)
-      let duration = endHour - startHour;
-      if (duration <= 0) duration = 1; // Safety fallback
+      let dailyHours = endHour - startHour;
+      if (dailyHours <= 0) dailyHours = 1; // Minimum 1 hour safety
 
-      return (duration * booking.hourly_rate).toFixed(2);
+      // --- B. Calculate Number of Days ---
+      const startDate = new Date(booking.start_date);
+      const endDate = new Date(booking.end_date);
+
+      // Normalize to midnight to ignore time differences
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      // Get difference in time (milliseconds)
+      const diffTime = Math.abs(endDate - startDate);
+      // Convert to days + 1 (because May 12 to May 12 is 1 day, not 0)
+      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      // --- C. Final Total ---
+      return (dailyHours * totalDays * booking.hourly_rate).toFixed(2);
     }
 
     // 3. Last Resort: Just return the hourly rate
     return booking.hourly_rate.toFixed(2);
   };
-  // Reusable Card Component to avoid code duplication
-  const BookingCard = ({ booking, isPast = false }) => (
-    <Box
-      key={booking.booking_id}
-      sx={{
-        border: "1px solid #e0e0e0",
-        borderRadius: "12px",
-        p: 3,
-        mb: 3,
-        backgroundColor: isPast ? "#f5f5f5" : "#fff",
-        opacity: isPast ? 0.8 : 1,
-        boxShadow: isPast ? "none" : "0 4px 12px rgba(0,0,0,0.05)",
-      }}
-    >
-      {/* Header */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-        <Typography sx={{ fontWeight: "700", fontSize: "1.1rem" }}>
-          {booking.service_level} Service
-        </Typography>
-        <Chip
-          label={booking.status}
-          color={
-            booking.status === "Confirmed"
-              ? "success"
-              : booking.status === "Pending"
-              ? "warning"
-              : booking.status === "Cancelled"
-              ? "error"
-              : "default"
-          }
-          variant={booking.status === "Confirmed" ? "filled" : "outlined"}
-          size="small"
-        />
-      </Box>
 
-      {/* Dates */}
-      <Typography sx={{ mb: 1, color: "#555" }}>
-        <b>📅 Date:</b>{" "}
-        {formatUTCtoLocalCalendarDate(booking.start_date, "MMM dd, yyyy")}
-      </Typography>
-      <Typography sx={{ mb: 2, color: "#555", fontSize: "0.9rem" }}>
-        ⏰ {booking.slots?.[0]?.startTime} - {booking.slots?.[0]?.endTime}
-      </Typography>
-
-      {/* Provider Info */}
-      <Typography sx={{ fontWeight: "600" }}>
-        Provider:{" "}
-        <span style={{ fontWeight: "normal" }}>
-          {booking.provider_first_name}{" "}
-          {booking.provider_last_name || "Waiting for match..."}
-        </span>
-      </Typography>
-
-      {/* Phone Number (Privacy Logic) */}
-      {booking.provider_phone ? (
-        <Typography sx={{ mt: 1, color: "green", fontWeight: "bold" }}>
-          📞{" "}
-          <a href={`tel:${booking.provider_phone}`}>{booking.provider_phone}</a>
-        </Typography>
-      ) : (
-        !isPast && (
-          <Typography
-            sx={{
-              mt: 1,
-              fontStyle: "italic",
-              fontSize: "0.85rem",
-              color: "#888",
-            }}
-          >
-            (Phone number hidden until confirmed)
-          </Typography>
-        )
-      )}
-
-      {/* Action Buttons (Only for Active/Pending) */}
-      {!isPast && (
-        <Box sx={{ mt: 3, textAlign: "right" }}>
-          <Button
-            variant="outlined"
-            color="error"
-            size="small"
-            onClick={() => handleCancel(booking.booking_id)}
-            disabled={cancelLoadingId === booking.booking_id}
-          >
-            {cancelLoadingId === booking.booking_id ? (
-              <CircularProgress size={16} />
-            ) : (
-              "Cancel Request"
-            )}
-          </Button>
-        </Box>
-      )}
-    </Box>
-  );
-  console.log("status", showListStatus);
+  console.log("pendingBookings", pendingBookings);
   return (
     <Box sx={{ p: 4, maxWidth: 900, margin: "auto" }}>
       <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
@@ -414,68 +337,59 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                 <Box
                   sx={{
                     border: "solid #000 2px",
-                    width: "90%",
                     borderRadius: 2,
                     backgroundColor: "#fff",
                     boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
                   }}
                 >
                   <Box
                     sx={{
                       display: "flex",
                       justifyContent: "space-between",
-                      mb: 2,
-                      // width: "100%",
+                      pt: 2,
+                      width: "94%",
                       margin: "0 auto",
-                      backgroundColor: "#4749df",
+                      // border: "solid red 2px",
                     }}
                   >
                     <Typography
                       sx={{
                         fontWeight: "600",
                         fontSize: "1.1rem",
-                        backgroundColor: "#4749df",
-                        color: "#fff",
+                        color: "#4749df",
                         padding: "4px 8px",
-                        width: "120px",
                         textAlign: "center",
                       }}
                     >
-                      {booking.service_level}
+                      {booking.service_level} ↔ ${booking.hourly_rate} / hr
                     </Typography>
-                    <Typography
-                      sx={{
-                        fontWeight: "600",
-                        fontSize: "1.1rem",
-                        padding: "4px 8px",
-                        backgroundColor: "#4749df",
-                        color: "#fff",
-                        width: "150px",
-                        textAlign: "center",
-                      }}
-                    >
-                      CAD {calculateTotal(booking)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ backgroundColor: "#fff", p: 2 }}>
                     <Typography
                       sx={{
                         mb: 1,
                         backgroundColor: "#efeffb",
-                        width: "fit-content",
-                        borderRadius: "8px",
-                        width: "100px",
-                        color: "#020e20",
+                        width: "150px",
                         textAlign: "center",
-                        fontWeight: "600",
+                        borderRadius: "60px",
+                        alignSelf: "center",
+                        border: "solid 1px #4749df",
                       }}
                     >
                       {booking.status}
                     </Typography>
+                  </Box>
+                  <Box sx={{ width: "96%", margin: "0 auto" }}>
                     <Typography sx={{ mb: 1, color: "#555" }}>
-                      <b>📅 Date:</b>{" "}
+                      <b>📅</b>{" "}
                       {formatUTCtoLocalCalendarDate(
                         booking.start_date,
+                        "MMM dd, yyyy"
+                      )}{" "}
+                      to{" "}
+                      {formatUTCtoLocalCalendarDate(
+                        booking.end_date,
                         "MMM dd, yyyy"
                       )}
                     </Typography>
@@ -485,31 +399,62 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                       ⏰ {booking.slots?.[0]?.startTime} -{" "}
                       {booking.slots?.[0]?.endTime}
                     </Typography>
-
+                    <Typography sx={{ mt: -1 }}>
+                      💲 {calculateTotal(booking)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ width: "96%", margin: "0 auto" }}>
+                    <Typography
+                      variant="subtitle2"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      CLIENT DETAILS
+                    </Typography>
                     <Typography sx={{ fontWeight: "600" }}>
-                      PSW:{" "}
-                      <span style={{ fontWeight: "normal" }}>
+                      👨{" "}
+                      <span style={{ fontWeight: "600" }}>
                         {booking.provider_first_name}{" "}
-                        {booking.provider_last_name || "Waiting for match..."}
+                        {booking.provider_last_name}
                       </span>
                     </Typography>
-                    <Typography>
-                      Rate: {booking.hourly_rate} CAD per hour
+                    <Typography sx={{ fontWeight: "600", color: "#888" }}>
+                      📞{" "}
+                      <span
+                        style={{
+                          fontWeight: "normal",
+                          fontStyle: "italic",
+                          backgroundColor: "#000",
+                          color: "#000",
+                        }}
+                      >
+                        111-222-3333
+                      </span>
+                      <span
+                        style={{ fontWeight: "normal", fontStyle: "italic" }}
+                      >
+                        (Once accepted phone number will be visible)
+                      </span>
                     </Typography>
                   </Box>
                   <Box
                     sx={{
                       display: "flex",
-                      mt: 3,
-                      width: "250px",
-                      ml: 3,
-                      mb: 2,
+                      pb: 2,
+                      width: "40%",
+                      // border: "solid red 2px",
+                      justifyContent: "center",
+                      alignSelf: "start",
                     }}
                   >
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="error"
-                      sx={{ width: "100%" }}
+                      sx={{
+                        border: "solid 2px #4749df",
+                        color: "#020e20",
+                        width: "80%",
+                      }}
                       onClick={() => handleCancel(booking.booking_id)}
                     >
                       Cancel
