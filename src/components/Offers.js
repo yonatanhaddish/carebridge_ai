@@ -60,7 +60,7 @@ export default function Offers() {
     setActionLoadingId(bookingId);
     try {
       await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/reject_request`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_provider/reject_booking`,
         { booking_id: bookingId }
       );
       fetchBookings(); // Refresh list
@@ -235,6 +235,7 @@ export default function Offers() {
                   booking.slots.map((slot, idx) => (
                     <Typography
                       sx={{ mb: 2, color: "#555", fontSize: "0.9rem" }}
+                      key={{ idx }}
                     >
                       ⏰ {booking.slots?.[0]?.startTime} -{" "}
                       {booking.slots?.[0]?.endTime}

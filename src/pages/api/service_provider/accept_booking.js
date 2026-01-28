@@ -74,7 +74,7 @@ async function handler(req, res) {
     // 7. Perform Acceptance
     booking.status = "Confirmed";
     // Optional: Add an audit note
-    booking.notes = `(Confirmed by ${provider.first_name} ${provider.last_name}.)`;
+    booking.notes = `Confirmed by ${provider.first_name} ${provider.last_name}.`;
 
     await booking.save();
 

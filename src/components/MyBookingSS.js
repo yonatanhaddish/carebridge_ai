@@ -75,7 +75,7 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
     setCancelLoadingId(bookingId);
     try {
       await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/cancel_request`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/service_seeker/cancel_booking`,
         {
           booking_id: bookingId,
         }
@@ -202,68 +202,59 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                 <Box
                   sx={{
                     border: "solid #000 2px",
-                    width: "90%",
                     borderRadius: 2,
                     backgroundColor: "#fff",
                     boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
                   }}
                 >
                   <Box
                     sx={{
                       display: "flex",
                       justifyContent: "space-between",
-                      mb: 2,
-                      // width: "100%",
+                      pt: 2,
+                      width: "94%",
                       margin: "0 auto",
-                      backgroundColor: "#4749df",
+                      // border: "solid red 2px",
                     }}
                   >
                     <Typography
                       sx={{
                         fontWeight: "600",
                         fontSize: "1.1rem",
-                        backgroundColor: "#4749df",
-                        color: "#fff",
+                        color: "#4749df",
                         padding: "4px 8px",
-                        width: "120px",
                         textAlign: "center",
                       }}
                     >
-                      {booking.service_level}
+                      {booking.service_level} ↔ ${booking.hourly_rate} / hr
                     </Typography>
-                    <Typography
-                      sx={{
-                        fontWeight: "600",
-                        fontSize: "1.1rem",
-                        padding: "4px 8px",
-                        backgroundColor: "#4749df",
-                        color: "#fff",
-                        width: "150px",
-                        textAlign: "center",
-                      }}
-                    >
-                      CAD {calculateTotal(booking)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ backgroundColor: "#fff", p: 2 }}>
                     <Typography
                       sx={{
                         mb: 1,
                         backgroundColor: "#efeffb",
-                        width: "fit-content",
-                        borderRadius: "8px",
-                        width: "100px",
-                        color: "#020e20",
+                        width: "150px",
                         textAlign: "center",
-                        fontWeight: "600",
+                        borderRadius: "60px",
+                        alignSelf: "center",
+                        border: "solid 1px #4749df",
                       }}
                     >
                       {booking.status}
                     </Typography>
+                  </Box>
+                  <Box sx={{ width: "96%", margin: "0 auto" }}>
                     <Typography sx={{ mb: 1, color: "#555" }}>
-                      <b>📅 Date:</b>{" "}
+                      <b>📅</b>{" "}
                       {formatUTCtoLocalCalendarDate(
                         booking.start_date,
+                        "MMM dd, yyyy"
+                      )}{" "}
+                      to{" "}
+                      {formatUTCtoLocalCalendarDate(
+                        booking.end_date,
                         "MMM dd, yyyy"
                       )}
                     </Typography>
@@ -273,37 +264,56 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                       ⏰ {booking.slots?.[0]?.startTime} -{" "}
                       {booking.slots?.[0]?.endTime}
                     </Typography>
-
+                    <Typography sx={{ mt: -1 }}>
+                      💲 {calculateTotal(booking)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ width: "96%", margin: "0 auto" }}>
+                    <Typography
+                      variant="subtitle2"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      PSW DETAILS
+                    </Typography>
                     <Typography sx={{ fontWeight: "600" }}>
                       👨{" "}
                       <span style={{ fontWeight: "600" }}>
                         {booking.provider_first_name}{" "}
-                        {booking.provider_last_name || "Waiting for match..."}
+                        {booking.provider_last_name}
                       </span>
                     </Typography>
-                    <Typography sx={{ color: "green", fontWeight: "bold" }}>
+                    <Typography sx={{ fontWeight: "600" }}>
                       📞{" "}
-                      <a href={`tel:${booking.provider_phone}`}>
-                        {booking.provider_phone}
-                      </a>
+                      <span style={{ fontWeight: "600" }}>
+                        {booking.provider_phone}{" "}
+                      </span>
                     </Typography>
-                    <Typography>
-                      💲 {booking.hourly_rate} CAD per hour
+                    <Typography sx={{ fontWeight: "600" }}>
+                      📧{" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {booking.provider_email}{" "}
+                      </span>
                     </Typography>
                   </Box>
                   <Box
                     sx={{
                       display: "flex",
-                      mt: 1,
-                      width: "250px",
-                      ml: 3,
-                      mb: 2,
+                      pb: 2,
+                      width: "40%",
+                      // border: "solid red 2px",
+                      justifyContent: "center",
+                      alignSelf: "start",
                     }}
                   >
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="error"
-                      sx={{ width: "100%" }}
+                      sx={{
+                        border: "solid 2px #4749df",
+                        color: "#020e20",
+                        width: "80%",
+                      }}
                       onClick={() => handleCancel(booking.booking_id)}
                     >
                       Cancel

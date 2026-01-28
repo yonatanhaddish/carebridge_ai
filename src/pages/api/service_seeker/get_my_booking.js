@@ -11,7 +11,7 @@ async function handler(req, res) {
   }
 
   const { userId } = req.user;
-  console.log("Get My Bookings Request by User:", userId);
+  //   console.log("Get My Bookings Request by User:", userId);
 
   try {
     await dbConnect();
@@ -107,11 +107,11 @@ async function handler(req, res) {
       },
     ]);
 
-    console.log(
-      "Retrieved Bookings for Seeker:",
-      seeker.service_seeker_id,
-      bookings
-    );
+    // console.log(
+    //   "Retrieved Bookings for Seeker:",
+    //   seeker.service_seeker_id,
+    //   bookings
+    // );
 
     return res.status(200).json({
       success: true,

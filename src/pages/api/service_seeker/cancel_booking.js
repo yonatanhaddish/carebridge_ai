@@ -12,12 +12,12 @@ async function handler(req, res) {
 
   try {
     await dbConnect();
-    const provider = await ServiceSeeker.findOne({ user_id: userId });
+    const seeker = await ServiceSeeker.findOne({ user_id: userId });
 
     // Find the booking (Authorized)
     const booking = await Booking.findOne({
       booking_id: booking_id,
-      service_seeker_id: provider.service_seeker_id,
+      service_seeker_id: seeker.service_seeker_id,
     });
 
     if (!booking) return res.status(404).json({ error: "Booking not found." });
@@ -31,7 +31,7 @@ async function handler(req, res) {
 
     // Update Status
     booking.status = "Cancelled";
-    booking.notes = (booking.notes || "") + " (Cancelled by Seeker)";
+    booking.notes = `Cancelled by ${seeker.first_name} ${seeker.last_name}`;
     await booking.save();
 
     return res

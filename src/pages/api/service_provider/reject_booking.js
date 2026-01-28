@@ -47,7 +47,7 @@ async function handler(req, res) {
 
     // 6. Perform Rejection
     booking.status = "Rejected";
-    booking.notes = (booking.notes || "") + " (Rejected by Provider)";
+    booking.notes = `Rejected by ${provider.first_name} ${provider.last_name}`;
     await booking.save();
 
     return res.status(200).json({
