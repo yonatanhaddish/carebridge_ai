@@ -64,6 +64,7 @@ async function handler(req, res) {
           // Dates & Times
           start_date: 1,
           end_date: 1,
+          days_of_week: 1,
           slots: 1, // The array of times { startTime, endTime }
 
           // Location (Your schema uses location.address)

@@ -82,6 +82,11 @@ export default async function handler(req, res) {
             8. 🛡️ REALITY CHECK & ERRORS:
               - If the user enters a non-existent date (e.g., "February 31st"), return: { "error": "Invalid Date: [Date] does not exist." }
               - If the user provides dates but NO time range, return: { "error": "Please specify a time range." }
+
+            9. 📅 WHOLE MONTH RULE (The "March 31st" Fix):
+              - If the user requests a service "for [Month]" (e.g., "for March"), set the 'endDate' to the LAST DAY of that month (e.g., 30th or 31st).
+              - Do NOT set the end date to the 1st of the following month.
+              - Example: "For March 2026" -> endDate: "2026-03-31", NOT "2026-04-01".
             
             Return ONLY raw JSON. No markdown formatting.
           `,

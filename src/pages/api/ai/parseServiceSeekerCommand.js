@@ -78,6 +78,12 @@ export default async function handler(req, res) {
             - **Example:** February 30th/31st is IMPOSSIBLE. June 31st is IMPOSSIBLE.
             - **Action:** If the user requests a non-existent date, DO NOT generate a schedule. Instead, set "error": "Invalid Date: [Explanation]".
 
+              ### PART 3: WHOLE MONTH RULE
+              - If the user requests a service "for [Month]" (e.g., "for March"), set the 'endDate' to the LAST DAY of that month (e.g., 30th or 31st).
+              - Do NOT set the end date to the 1st of the following month.
+              - Example: "For March 2026" -> endDate: "2026-03-31", NOT "2026-04-01".
+            
+
             Output JSON Structure:
             {
               "intent": "book" | "list",

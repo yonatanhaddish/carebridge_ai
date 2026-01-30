@@ -4,61 +4,63 @@ import ServiceSeeker from "@/models/ServiceSeeker";
 import Booking from "@/models/Booking";
 import { authMiddleware } from "@/lib/auth";
 
-// --- HELPER 1: Convert "HH:MM" to Minutes (Bulletproof) ---
+// --- HELPER 1: Convert "HH:MM" to Minutes ---
 function getMinutes(timeStr, explicitCrossesMidnight = false) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(":").map(Number);
   let totalMinutes = h * 60 + m;
-
-  // Use the explicit flag from DB if available
   if (explicitCrossesMidnight) totalMinutes += 1440;
-
   return totalMinutes;
 }
 
 // --- HELPER 2: Availability Containment Check ---
-// Does the Provider's shift (P) fully enclose the Request (R)?
 function isTimeContained(providerSlot, reqSlot) {
   const pStart = getMinutes(providerSlot.startTime);
   const pEnd = getMinutes(providerSlot.endTime, providerSlot.crossesMidnight);
-
   const rStart = getMinutes(reqSlot.startTime);
 
-  // Auto-detect midnight crossing for the request if not explicitly set
+  // Auto-detect midnight crossing for the request
   let rEndRaw = getMinutes(reqSlot.endTime);
   const rCrosses = reqSlot.crossesMidnight || rEndRaw < rStart;
   const rEnd = getMinutes(reqSlot.endTime, rCrosses);
 
-  // Logic: Provider starts before (or at) request, AND ends after (or at) request
   return pStart <= rStart && pEnd >= rEnd;
 }
 
-// --- HELPER 3: Strict Date Range Check (The Fix 🛡️) ---
-// Ensures the User's requested range fits COMPLETELY inside the Provider's rule
-function isDateRangeValid(schedule, reqStartDate, reqEndDate) {
-  // 1. Recurring Rule Check
-  // Even for recurring, the specific dates requested must fall within the "Validity Window" of the rule
-  // e.g. "I work Mondays (from Jan 1 to Mar 1)"
-  if (schedule.type === "recurring") {
-    // Check if the Day of Week matches the START date
-    const reqDayIndex = reqStartDate.getUTCDay();
-    if (!schedule.daysOfWeek.includes(reqDayIndex)) return false;
-  }
-
-  // 2. Strict Range Containment (For both Recurring and Specific Date)
+// --- HELPER 3: Strict Date Range Check ---
+function isDateRangeValid(schedule, reqStartDate, reqEndDate, reqDaysOfWeek) {
   const provStart = new Date(schedule.startDate);
   const provEnd = new Date(schedule.endDate);
-
-  // Normalize to remove time (00:00:00) to compare dates strictly
   const rStart = new Date(reqStartDate);
   const rEnd = new Date(reqEndDate);
+
   rStart.setUTCHours(0, 0, 0, 0);
   rEnd.setUTCHours(0, 0, 0, 0);
   provStart.setUTCHours(0, 0, 0, 0);
   provEnd.setUTCHours(0, 0, 0, 0);
 
-  // Logic: User Start >= Provider Start AND User End <= Provider End
-  return rStart >= provStart && rEnd <= provEnd;
+  if (rStart < provStart || rEnd > provEnd) return false;
+
+  if (reqDaysOfWeek && reqDaysOfWeek.length > 0) {
+    if (schedule.type !== "recurring") return false;
+    const allDaysCovered = reqDaysOfWeek.every((day) =>
+      schedule.daysOfWeek.includes(day)
+    );
+    if (!allDaysCovered) return false;
+  } else {
+    if (schedule.type === "recurring") {
+      const reqDayIndex = rStart.getUTCDay();
+      if (!schedule.daysOfWeek.includes(reqDayIndex)) return false;
+    }
+  }
+  return true;
+}
+
+// --- HELPER 4: Overlap Check for Recurring Days ---
+function doDaysOverlap(reqDays, existingDays) {
+  if (!reqDays || reqDays.length === 0) return true;
+  if (!existingDays || existingDays.length === 0) return true;
+  return reqDays.some((day) => existingDays.includes(day));
 }
 
 async function handler(req, res) {
@@ -71,61 +73,73 @@ async function handler(req, res) {
 
   try {
     await dbConnect();
-
-    // 1. Get Seeker
     const seeker = await ServiceSeeker.findOne({ user_id: userId });
     if (!seeker || !seeker.location)
       return res.status(404).json({ error: "Seeker profile incomplete." });
 
-    // 2. Parse User Request
     const primaryReq = schedules[0];
     if (!primaryReq)
       return res.status(400).json({ error: "No schedule specified." });
 
-    // Normalize Request Dates (Start AND End)
     const reqStartDate = new Date(primaryReq.startDate);
-    const reqEndDate = new Date(primaryReq.endDate); // <--- Critical for Range Check
+    const reqEndDate = new Date(primaryReq.endDate);
+    const reqDaysOfWeek = primaryReq.daysOfWeek || [];
 
-    const reqSlot = primaryReq.slots[0] || {
-      startTime: "09:00",
-      endTime: "17:00",
-    };
+    // --- CALCULATE CONSTRAINT DAYS ---
+    // If specific date (March 12), this becomes [4] (Thursday)
+    let constraintDays = [...reqDaysOfWeek];
+    if (constraintDays.length === 0) {
+      let dCurr = new Date(reqStartDate);
+      dCurr.setUTCHours(0, 0, 0, 0);
+      const dEnd = new Date(reqEndDate);
+      dEnd.setUTCHours(0, 0, 0, 0);
 
-    // Auto-fix midnight flag
-    const reqStartMin = getMinutes(reqSlot.startTime);
-    const reqEndMinRaw = getMinutes(reqSlot.endTime);
-    if (reqEndMinRaw < reqStartMin) reqSlot.crossesMidnight = true;
+      while (dCurr <= dEnd) {
+        constraintDays.push(dCurr.getUTCDay());
+        dCurr.setUTCDate(dCurr.getUTCDate() + 1);
+      }
+    }
 
-    // Check if YOU (the user) already have a booking at this time
-    const existingSelfBooking = await Booking.findOne({
-      service_seeker_id: seeker.service_seeker_id,
-      status: { $in: ["Confirmed", "Pending"] }, // Ignore Cancelled/Rejected
-
-      // Date Overlap
-      start_date: { $lte: reqEndDate },
-      end_date: { $gte: reqStartDate },
-
-      // Time Slot Overlap
-      $or: [
-        {
-          "slots.startTime": { $lt: reqSlot.endTime },
-          "slots.endTime": { $gt: reqSlot.startTime },
-        },
-      ],
+    const reqSlots = primaryReq.slots.map((slot) => {
+      const start = getMinutes(slot.startTime);
+      const end = getMinutes(slot.endTime);
+      return { ...slot, crossesMidnight: end < start };
     });
 
-    if (existingSelfBooking) {
+    if (reqSlots.length === 0)
+      return res.status(400).json({ error: "No time slots provided." });
+
+    // --- CHECK 1: USER CONFLICTS ---
+    const userConflicts = await Booking.find({
+      service_seeker_id: seeker.service_seeker_id,
+      status: { $in: ["Confirmed", "Pending"] },
+      start_date: { $lte: reqEndDate },
+      end_date: { $gte: reqStartDate },
+      $or: reqSlots.map((rSlot) => ({
+        "slots.startTime": { $lt: rSlot.endTime },
+        "slots.endTime": { $gt: rSlot.startTime },
+      })),
+    });
+
+    // ✅ FIXED: Use constraintDays (e.g. [4]) instead of reqDaysOfWeek (e.g. [])
+    // This ensures Thursday [4] doesn't clash with Wed/Sat [3,6]
+    const actualUserConflict = userConflicts.find((b) =>
+      doDaysOverlap(constraintDays, b.days_of_week)
+    );
+
+    if (actualUserConflict) {
       return res.status(409).json({
         error: "Double Booking Detected",
-        message: "You already have a booking for this time slot.",
-        conflicting_booking_id: existingSelfBooking.booking_id,
+        message:
+          "You already have a booking overlapping with one of these times.",
+        conflicting_booking_id: actualUserConflict.booking_id,
       });
     }
 
     const requestedLevel = service_level || "Level 1";
-    const distanceMeters = (max_distance_km || 20) * 1000;
+    const distanceMeters = (max_distance_km || 30) * 1000;
 
-    // 3. Find Candidates (Location & Level)
+    // --- FIND CANDIDATES ---
     const candidates = await ServiceProvider.find({
       service_level: requestedLevel,
       location: {
@@ -136,76 +150,71 @@ async function handler(req, res) {
       },
     }).limit(10);
 
-    if (candidates.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No providers found nearby with that skill level." });
-    }
-    console.log("Candidates Found:", candidates);
-    // 4. Vetting Loop
+    if (candidates.length === 0)
+      return res.status(404).json({ error: "No providers found nearby." });
+
+    // --- VETTING LOOP ---
     let bestProvider = null;
     let correctRate = 25;
 
     for (const provider of candidates) {
-      // --- CHECK A: IS PROVIDER WORKING? (Availability) ---
+      // Check Availability
       const workingSchedule = provider.availability_calendar?.schedules?.find(
         (schedule) => {
-          // 1. Check Strict Date Range (Now passes End Date too)
-          if (!isDateRangeValid(schedule, reqStartDate, reqEndDate))
+          if (
+            !isDateRangeValid(schedule, reqStartDate, reqEndDate, reqDaysOfWeek)
+          )
             return false;
 
-          // 2. Check Time Match
-          return schedule.slots.some((pSlot) =>
-            isTimeContained(pSlot, reqSlot)
-          );
+          const allSlotsCovered = reqSlots.every((reqSlot) => {
+            return schedule.slots.some((provSlot) =>
+              isTimeContained(provSlot, reqSlot)
+            );
+          });
+          return allSlotsCovered;
         }
       );
 
-      if (!workingSchedule) {
-        continue;
-      }
+      if (!workingSchedule) continue;
 
-      // --- CHECK B: IS PROVIDER BOOKED? (Conflict) ---
-      const conflictCount = await Booking.countDocuments({
+      // Check Provider Conflict
+      const potentialConflicts = await Booking.find({
         service_provider_id: provider.service_provider_id,
         status: { $in: ["Confirmed", "Pending", "Completed"] },
-
-        // Date Overlap
         start_date: { $lte: reqEndDate },
         end_date: { $gte: reqStartDate },
-
-        // Time Slot Overlap
-        $or: [
-          {
-            "slots.startTime": { $lt: reqSlot.endTime },
-            "slots.endTime": { $gt: reqSlot.startTime },
-          },
-        ],
+        $or: reqSlots.map((rSlot) => ({
+          "slots.startTime": { $lt: rSlot.endTime },
+          "slots.endTime": { $gt: rSlot.startTime },
+        })),
       });
 
-      if (conflictCount > 0) {
-        continue;
-      }
+      // ✅ FIXED: Use constraintDays here as well
+      const hasRealConflict = potentialConflicts.some((b) =>
+        doDaysOverlap(constraintDays, b.days_of_week)
+      );
 
-      // ✅ WINNER FOUND
+      if (hasRealConflict) continue;
+
+      // Winner Found
       bestProvider = provider;
       if (provider.hourly_rates) {
-        if (typeof provider.hourly_rates.get === "function") {
-          correctRate = provider.hourly_rates.get(requestedLevel);
-        } else {
-          correctRate = provider.hourly_rates[requestedLevel];
-        }
+        correctRate =
+          typeof provider.hourly_rates.get === "function"
+            ? provider.hourly_rates.get(requestedLevel)
+            : provider.hourly_rates[requestedLevel];
       }
       break;
     }
 
-    if (!bestProvider) {
+    if (!bestProvider)
       return res
         .status(404)
-        .json({ error: "Providers found nearby, but none are available." });
-    }
+        .json({
+          error: "Providers found, but none available for all requested times.",
+        });
 
-    // 5. Create Booking Object
+    // --- CREATE BOOKING ---
     const newBooking = {
       service_seeker_id: seeker.service_seeker_id,
       service_provider_id: bestProvider.service_provider_id,
@@ -215,20 +224,21 @@ async function handler(req, res) {
       booking_type: primaryReq.type,
       start_date: reqStartDate,
       end_date: reqEndDate,
-      days_of_week: primaryReq.daysOfWeek || [],
-      slots: [reqSlot],
+      days_of_week: reqDaysOfWeek, // Keep original (empty if specific date)
+      slots: reqSlots,
       location: {
         address: location_query || seeker.home_address,
         postal_code: seeker.location.postal_code,
         type: "Point",
         coordinates: seeker.location.coordinates,
       },
-      notes: "Auto-booked via AI",
+      notes: `${
+        seeker.email
+      } AI booked multi-slot at ${new Date().toLocaleString()}`,
     };
 
-    // Note: Uncomment to enable saving
     const savedBooking = await Booking.create(newBooking);
-    console.log("New Booking Details:", savedBooking);
+
     return res.status(201).json({
       success: true,
       message: "Match found!",

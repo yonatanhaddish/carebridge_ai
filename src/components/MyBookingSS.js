@@ -93,43 +93,73 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
   };
 
   const calculateTotal = (booking) => {
-    // 1. If database has the total, use it directly (Best Case)
     if (booking.total_estimated_cost) {
       return booking.total_estimated_cost.toFixed(2);
     }
 
-    // 2. Fallback: Calculate manually (Slots × Days × Rate)
     if (booking.slots && booking.slots.length > 0) {
-      const slot = booking.slots[0];
+      // --- A. Calculate Total Hours Per Day (No changes here) ---
+      const totalDailyHours = booking.slots.reduce((total, slot) => {
+        const [startH, startM] = slot.startTime.split(":").map(Number);
+        const [endH, endM] = slot.endTime.split(":").map(Number);
+        const startMinutes = startH * 60 + startM;
+        let endMinutes = endH * 60 + endM;
+        if (endMinutes < startMinutes) endMinutes += 1440;
+        return total + (endMinutes - startMinutes) / 60;
+      }, 0);
 
-      // --- A. Calculate Hours Per Day ---
-      const startHour = parseInt(slot.startTime.split(":")[0], 10);
-      const endHour = parseInt(slot.endTime.split(":")[0], 10);
-
-      let dailyHours = endHour - startHour;
-      if (dailyHours <= 0) dailyHours = 1; // Minimum 1 hour safety
-
-      // --- B. Calculate Number of Days ---
+      // --- B. Calculate Number of Days (FIXED FOR TIMEZONE) ---
+      // We assume booking.start_date is "YYYY-MM-DD" or ISO string
       const startDate = new Date(booking.start_date);
       const endDate = new Date(booking.end_date);
 
-      // Normalize to midnight to ignore time differences
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(0, 0, 0, 0);
+      // Force dates to UTC Midnight to avoid time offsets
+      startDate.setUTCHours(0, 0, 0, 0);
+      endDate.setUTCHours(0, 0, 0, 0);
 
-      // Get difference in time (milliseconds)
-      const diffTime = Math.abs(endDate - startDate);
-      // Convert to days + 1 (because May 12 to May 12 is 1 day, not 0)
-      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      let validDaysCount = 0;
+      const targetDays = booking.days_of_week;
+
+      // Scenario 1: Recurring
+      if (targetDays && targetDays.length > 0) {
+        let current = new Date(startDate);
+
+        // Loop using UTC so "March 1st" stays "March 1st" everywhere
+        while (current <= endDate) {
+          // 🔥 FIX: Use getUTCDay() instead of getDay()
+          if (targetDays.includes(current.getUTCDay())) {
+            validDaysCount++;
+          }
+          // 🔥 FIX: Increment using UTC date
+          current.setUTCDate(current.getUTCDate() + 1);
+        }
+      }
+      // Scenario 2: Continuous
+      else {
+        const diffTime = Math.abs(endDate - startDate);
+        validDaysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      }
 
       // --- C. Final Total ---
-      return (dailyHours * totalDays * booking.hourly_rate).toFixed(2);
+      return (totalDailyHours * validDaysCount * booking.hourly_rate).toFixed(
+        2
+      );
     }
 
-    // 3. Last Resort: Just return the hourly rate
     return booking.hourly_rate.toFixed(2);
   };
+  // Map 0-6 to readable text
+  const daysMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  const getScheduleLabel = (booking) => {
+    // SCENARIO A: Recurring (Specific Days) -> Show "Mon, Wed"
+    if (booking.days_of_week && booking.days_of_week.length > 0) {
+      const sortedDays = [...booking.days_of_week].sort((a, b) => a - b);
+      const dayNames = sortedDays.map((d) => daysMap[d]).join(", ");
+
+      return <strong>{dayNames}</strong>;
+    }
+  };
   console.log("pendingBookings", pendingBookings);
   return (
     <Box sx={{ p: 4, maxWidth: 900, margin: "auto" }}>
@@ -258,6 +288,7 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                         "MMM dd, yyyy"
                       )}
                     </Typography>
+
                     <Typography
                       sx={{ mb: 2, color: "#555", fontSize: "0.9rem" }}
                     >
@@ -404,10 +435,19 @@ export default function MyBookingSS({ sendBookingDataToParent }) {
                       )}
                     </Typography>
                     <Typography
+                      sx={{ mb: 1, color: "#333", fontSize: "0.95rem" }}
+                    >
+                      Every {getScheduleLabel(booking)}
+                    </Typography>
+                    <Typography
+                      component="div"
                       sx={{ mb: 2, color: "#555", fontSize: "0.9rem" }}
                     >
-                      ⏰ {booking.slots?.[0]?.startTime} -{" "}
-                      {booking.slots?.[0]?.endTime}
+                      {booking.slots?.map((slot, index) => (
+                        <div key={index}>
+                          ⏰ {slot.startTime} - {slot.endTime}
+                        </div>
+                      ))}
                     </Typography>
                     <Typography sx={{ mt: -1 }}>
                       💲 {calculateTotal(booking)}

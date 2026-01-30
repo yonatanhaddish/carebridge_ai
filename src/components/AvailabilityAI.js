@@ -63,7 +63,7 @@ function AvailabilityAI() {
       setLoading(false);
     }
   };
-
+  console.log("aiData", parsedData);
   // --- STEP 2: SAVE TO DATABASE ---
   const handleSave = async () => {
     if (!parsedData) return;
