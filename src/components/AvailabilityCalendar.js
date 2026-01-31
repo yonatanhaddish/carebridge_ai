@@ -32,18 +32,6 @@ export default function AvailabiltiyCalendar() {
   const [notification, setNotification] = useState(null);
   const [showCalendarUpdate, setShowCalendarUpdate] = useState(false);
 
-  useEffect(() => {
-    if (availability.length > 0) {
-      setShowCalendarUpdate(true);
-
-      const timer = setTimeout(() => {
-        setShowCalendarUpdate(false);
-      }, 5000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [availability]);
-
   // --- Local conflict check ---
   const localConflictCheck = (newSlot) =>
     selectedSlots.some((slot) => {
@@ -63,6 +51,7 @@ export default function AvailabiltiyCalendar() {
       end: endTime.format("HH:mm"),
       day: selectedDate.format("dddd"),
     };
+    setNotification(null);
 
     if (localConflictCheck(newSlot)) {
       setNotification({
@@ -118,8 +107,9 @@ export default function AvailabiltiyCalendar() {
     }
   };
 
-  const handleRemoveSlot = (index) =>
+  const handleRemoveSlot = (index) => {
     setSelectedSlots((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleCloseNotification = () => setNotification(null);
 
@@ -134,6 +124,10 @@ export default function AvailabiltiyCalendar() {
 
   const groupedSelected = groupSlotsByDate(selectedSlots);
   const groupedAvailability = groupSlotsByDate(availability);
+
+  console.log({
+    notification,
+  });
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -229,7 +223,7 @@ export default function AvailabiltiyCalendar() {
 
         {/* Already Added Availability */}
         {showCalendarUpdate && availability.length > 0 && (
-          <Paper sx={{ p: 3, mb: 3 }}>
+          <Paper sx={{ p: 3, mb: 3, border: "solid red 2px" }}>
             <Typography variant="subtitle1" gutterBottom>
               Calendar Updated
             </Typography>
@@ -257,8 +251,26 @@ export default function AvailabiltiyCalendar() {
           </Paper>
         )}
 
+        {/* {successUpdate && (
+          <Box sx={{ border: "solid #efeffb 1px", width: "100%" }}>
+            <Alert
+              icon={false}
+              sx={{
+                width: "100%",
+                textAlign: "center",
+                justifyContent: "center",
+                color: "#020e20",
+                fontSize: "1.1rem",
+                fontWeight: 500,
+              }}
+            >
+              Update availability action was successful.
+            </Alert>
+          </Box>
+        )} */}
+
         {/* Notifications */}
-        <Snackbar
+        {/* <Snackbar
           open={!!notification}
           // autoHideDuration={6000}
           onClose={handleCloseNotification}
@@ -280,7 +292,7 @@ export default function AvailabiltiyCalendar() {
               </Box>
             )}
           </Alert>
-        </Snackbar>
+        </Snackbar> */}
       </Box>
     </LocalizationProvider>
   );

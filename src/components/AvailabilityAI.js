@@ -14,6 +14,7 @@ import {
   ListItem,
   ListItemText,
   Divider,
+  Snackbar,
 } from "@mui/material";
 import {
   EventRepeat as RecurringIcon,
@@ -22,14 +23,21 @@ import {
   Warning as ConflictIcon,
 } from "@mui/icons-material";
 
-// Helper: Convert Schema Numbers [0-6] to "Sun, Mon..."
-const mapWeekdays = (days) => {
-  if (!days || days.length === 0) return "";
-  const map = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  // Handle if AI returns strings "MO" by mistake, or numbers 1
-  return days.map((d) => (typeof d === "number" ? map[d] : d)).join(", ");
-};
+export function formatUTCtoLocalCalendarDate(utcDateStr, fmt = "yyyy-MM-dd") {
+  if (!utcDateStr) return "";
 
+  // 1. If it's a full ISO string (e.g., "2026-03-09T00:00:00.000Z"),
+  //    we slice off the "T..." part to get just "2026-03-09".
+  const dateOnlyString =
+    typeof utcDateStr === "string" ? utcDateStr.split("T")[0] : utcDateStr;
+
+  // 2. parseISO("2026-03-09") creates a date at LOCAL midnight (00:00 EST),
+  //    keeping the day as the 9th.
+  const date = parseISO(dateOnlyString);
+
+  // 3. Format it
+  return format(date, fmt);
+}
 function AvailabilityAI() {
   const [command, setCommand] = useState("");
   const [parsedData, setParsedData] = useState(null);
@@ -38,6 +46,7 @@ function AvailabilityAI() {
   const [error, setError] = useState(null);
   const [conflicts, setConflicts] = useState(null);
   const [conflictObject, setConflictObject] = useState(null);
+  const [successUpdate, setSuccessUpdated] = useState(false);
 
   // --- STEP 1: ANALYZE TEXT ---
   const handleAnalyze = async (e) => {
@@ -73,31 +82,36 @@ function AvailabilityAI() {
     setError(null); // Clear previous errors
 
     try {
-      await axios.post(
+      const res = await axios.post(
         "/api/service_provider/update_availability",
         { schedules: parsedData.schedules, mode: "append" },
         { withCredentials: true }
       );
 
       // Success Path
-      alert("Success! Your availability is live.");
-      setCommand("");
-      setParsedData(null);
+      if (res.statusText === "OK") {
+        setCommand("");
+        setParsedData(null);
+        setSuccessUpdated(true);
+        setOpenSuccess(true);
+        setTimeout(() => {
+          const timer = setTimeout(() => {
+            setSuccessUpdated(false);
+          }, 4000);
+          return () => clearTimeout(timer);
+        });
+      } else {
+        setSuccessUpdated(false);
+      }
     } catch (err) {
       // 1. Log it for debugging (this causes the stack trace in console, which is fine)
       console.log("Save request finished.");
 
       // 2. Check for Conflict (409)
       if (err.response && err.response.status === 409) {
-        // ✅ ONLY show the Yellow Box
         setConflicts(err.response.data.dataConflict);
         setConflictObject(err.response.data.dataConflict);
-
-        // ❌ DO NOT set the Red Error box.
-        // We leave setError(null) so the UI stays clean.
       } else {
-        // 3. Real Crash (Database down, 500, etc)
-        // NOW we show the Red Box
         console.error("Critical Error:", err);
         setError(err.response?.data?.error || "Failed to save.");
       }
@@ -105,84 +119,119 @@ function AvailabilityAI() {
       setSaving(false);
     }
   };
-  // console.log("333", conflictObject);
+
+  const handleCloseSuccess = (event, reason) => {
+    if (reason === "clickaway") return;
+    setOpenSuccess(false);
+  };
+  console.log({
+    command,
+    parsedData,
+    successUpdate,
+  });
 
   // --- RENDER HELPERS ---
   const renderPreview = (data) => {
     const schedules = data?.schedules || [];
+
     if (schedules.length === 0)
       return <Typography>No schedules found.</Typography>;
 
     return (
       <Box>
-        <Typography
-          variant="subtitle1"
-          sx={{
-            fontWeight: "bold",
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            color: "#2e7d32",
-          }}
-        >
-          <SuccessIcon fontSize="small" /> AI Understood:
-        </Typography>
-
-        <List dense sx={{ mb: 2 }}>
+        <List dense sx={{}}>
           {schedules.map((item, index) => {
-            const start = format(parseISO(item.startDate), "MMM do");
-            const end = item.endDate
-              ? format(parseISO(item.endDate), "MMM do, yyyy")
-              : null;
-            const fullStart = format(parseISO(item.startDate), "MMM do, yyyy");
-
-            const isRange = item.endDate && item.startDate !== item.endDate;
+            const DAYS_MAP = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
             return (
               <React.Fragment key={index}>
                 <ListItem alignItems="flex-start" sx={{ px: 0 }}>
                   <ListItemText
                     primary={
-                      <Box
-                        component="span"
-                        sx={{ fontWeight: "bold", fontSize: "1.1rem" }}
-                      >
-                        {item.slots
-                          .map((s) => `${s.startTime}-${s.endTime}`)
-                          .join(", ")}
+                      <Box component="span" sx={{ display: "block" }}>
+                        {/* ROW 1: The "When" (Days or Date) */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 0.5,
+                            // border: "solid blue 1px",
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            component="span"
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {item.type === "recurring" && (
+                              // RECURRING: "Every Wed, Sat"
+                              <span>
+                                Every{" "}
+                                {item.daysOfWeek
+                                  .map((d) => DAYS_MAP[d])
+                                  .join(", ")}
+                              </span>
+                            )}
+                            {item.type === "specific_date" &&
+                              item.startDate === item.endDate && (
+                                // SPECIFIC: "Fri, Mar 12"
+                                <span>
+                                  {formatUTCtoLocalCalendarDate(
+                                    item.startDate,
+                                    "MMM d, yyyy"
+                                  )}
+                                </span>
+                              )}
+                          </Typography>
+                        </Box>
+
+                        {/* ROW 2: The Date Range (Only show for Recurring or if start!=end) */}
+                        {(item.type === "recurring" ||
+                          item.startDate !== item.endDate) && (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              // border: "solid red 1px",
+                            }}
+                          >
+                            {/* ml: 3.5 aligns it under the text, skipping the icon */}
+                            <Typography
+                              sx={{
+                                fontWeight: "400",
+                                color: "#020e20",
+                              }}
+                            >
+                              <b>📅</b> {/* Start Date */}
+                              {formatUTCtoLocalCalendarDate(
+                                item.startDate,
+                                "MMM d, yyyy"
+                              )}
+                              <span style={{ margin: "0 4px" }}>—</span>
+                              {/* End Date */}
+                              {formatUTCtoLocalCalendarDate(
+                                item.endDate,
+                                "MMM d, yyyy"
+                              )}
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
                     }
                     secondary={
-                      <Box component="span" sx={{ display: "block", mt: 1 }}>
-                        {item.type === "recurring" && (
-                          <Chip
-                            icon={<RecurringIcon sx={{ fontSize: 16 }} />}
-                            label={`Every ${mapWeekdays(item.daysOfWeek)}`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                            sx={{ mr: 1, mb: 1 }}
-                          />
-                        )}
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      <Box component="span">
+                        {/* ⏰ BOTTOM LINE: Time Slots */}
+                        <Typography
+                          component="div"
+                          sx={{ mb: 2, color: "#555", fontSize: "0.9rem" }}
                         >
-                          <OneTimeIcon
-                            sx={{ fontSize: 18, color: "text.secondary" }}
-                          />
-                          <Typography variant="body2" component="span">
-                            {isRange ? (
-                              <span style={{ fontWeight: 600 }}>
-                                {start}{" "}
-                                <span style={{ color: "#aaa" }}>to</span> {end}
-                              </span>
-                            ) : (
-                              <span style={{ fontWeight: 600 }}>
-                                {fullStart}
-                              </span>
-                            )}
-                          </Typography>
-                        </Box>
+                          {item.slots?.map((slot, index) => (
+                            <div key={index}>
+                              ⏰ {slot.startTime} - {slot.endTime}
+                            </div>
+                          ))}
+                        </Typography>
                       </Box>
                     }
                   />
@@ -232,9 +281,6 @@ function AvailabilityAI() {
         >
           <ConflictIcon sx={{ mr: 1, fontSize: 20 }} />
           Schedule Conflicts Detected
-        </Typography>
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          The following times overlap with your existing schedule:
         </Typography>
         <List dense>
           {conflictObject.map((c, i) => (
@@ -290,7 +336,6 @@ function AvailabilityAI() {
       <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
         AI Assistant
       </Typography>
-
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
           Update Your Availability
@@ -299,7 +344,6 @@ function AvailabilityAI() {
           Type your schedule naturally (e.g., "I work every Mon and Wed from 9am
           to 5pm").
         </Typography>
-
         <form onSubmit={handleAnalyze}>
           <TextField
             multiline
@@ -337,7 +381,7 @@ function AvailabilityAI() {
       )}
 
       {/* --- PREVIEW SECTION --- */}
-      {parsedData && !conflictObject && (
+      {parsedData && !conflictObject && !successUpdate && (
         <Alert
           severity="success"
           icon={false}
@@ -357,6 +401,23 @@ function AvailabilityAI() {
         >
           {renderConflicts()}
         </Alert>
+      )}
+      {successUpdate && (
+        <Box sx={{ border: "solid #efeffb 1px", width: "100%" }}>
+          <Alert
+            icon={false}
+            sx={{
+              width: "100%",
+              textAlign: "center",
+              justifyContent: "center",
+              color: "#020e20",
+              fontSize: "1.1rem",
+              fontWeight: 500,
+            }}
+          >
+            Update availability action was successful.
+          </Alert>
+        </Box>
       )}
     </Box>
   );
